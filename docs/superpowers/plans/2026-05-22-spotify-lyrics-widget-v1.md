@@ -649,7 +649,9 @@ git commit -m "feat: add PKCE auth module with token management"
 
 ```python
 # tests/test_spotify_worker.py
+import time
 from unittest.mock import patch, MagicMock
+import httpx
 from src.spotify_worker import parse_player_state, detect_changes, PlayerState
 
 
@@ -777,7 +779,7 @@ class TestSpotifyWorker401:
         mock_config.access_token = "old_token"
         mock_config.refresh_token = "refresh"
         mock_config.client_id = "client"
-        mock_config.token_expires_at = 0  # expired
+        mock_config.token_expires_at = int(time.time()) + 3600  # locally looks valid
 
         mock_refresh.return_value = {
             "access_token": "new_token",
@@ -924,17 +926,7 @@ class SpotifyWorker(QThread):
 
     def run(self):
         while self._running:
-            try:
-                self._poll_once()
-                if self._network_failed:
-                    self._network_failed = False
-                    self.network_recovered.emit()
-            except (httpx.ConnectError, httpx.TimeoutException):
-                if not self._network_failed:
-                    self._network_failed = True
-                    self.network_error.emit()
-            except Exception:
-                pass
+            self._poll_once()
             self.msleep(1000)
 
     def _refresh_token(self) -> bool:
@@ -984,8 +976,21 @@ class SpotifyWorker(QThread):
         return response
 
     def _poll_once(self):
+        try:
+            response = self._make_spotify_request()
+        except (httpx.ConnectError, httpx.TimeoutException):
+            if not self._network_failed:
+                self._network_failed = True
+                self.network_error.emit()
+            return
+        except Exception:
+            return
 
-        response = self._make_spotify_request()
+        # Successful network contact — recover from previous failure
+        if self._network_failed:
+            self._network_failed = False
+            self.network_recovered.emit()
+
         if response is None:
             return  # auth_expired already emitted
 
@@ -2214,17 +2219,19 @@ class TestSpotifyWorkerNetworkError:
         mock_config.access_token = "valid"
 
         worker = SpotifyWorker(mock_config)
-        signals = []
-        worker.network_error.connect(lambda: signals.append("error"))
+        error_signals = []
+        worker.network_error.connect(lambda: error_signals.append("error"))
 
-        # Calling _poll_once should not crash, error handled internally
+        worker._poll_once()  # should not crash
+        assert len(error_signals) == 1
+
+        # Second failure should NOT emit again (already in failed state)
         worker._poll_once()
-        # Worker continues running (doesn't crash)
+        assert len(error_signals) == 1
 
     @patch("src.spotify_worker.httpx.get")
     def test_recovery_after_network_error(self, mock_get):
         from src.spotify_worker import SpotifyWorker
-        # First call fails, second succeeds
         mock_get.side_effect = [
             httpx.ConnectError("No internet"),
             MagicMock(status_code=204, text=""),
@@ -2235,11 +2242,16 @@ class TestSpotifyWorkerNetworkError:
         mock_config.access_token = "valid"
 
         worker = SpotifyWorker(mock_config)
-        signals = []
-        worker.network_recovered.connect(lambda: signals.append("recovered"))
+        error_signals = []
+        recovered_signals = []
+        worker.network_error.connect(lambda: error_signals.append("error"))
+        worker.network_recovered.connect(lambda: recovered_signals.append("recovered"))
 
-        worker._poll_once()  # fails
-        worker._poll_once()  # recovers
+        worker._poll_once()  # fails — emits network_error
+        assert len(error_signals) == 1
+
+        worker._poll_once()  # succeeds — emits network_recovered
+        assert len(recovered_signals) == 1
 
 
 import httpx
