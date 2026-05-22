@@ -37,7 +37,7 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
   - V1 (core): `user-read-currently-playing`
   - V2 (controls): `user-modify-playback-state` (play/pause, next, prev)
   - V2 (playlist): `playlist-modify-public`, `playlist-modify-private`, `playlist-read-private`
-- **Token refresh:** Access token expires in 1 hour. Auto-refresh using refresh token before expiry. PKCE flow returns a new refresh token on each refresh — must save the new one each time, old one becomes invalid.
+- **Token refresh:** Access token expires in 1 hour. Auto-refresh using refresh token before expiry. Spotify's refresh response may or may not include a new `refresh_token`. If present, save the new one. If absent, continue using the existing refresh token.
 - **First-time auth:** Open system browser to Spotify login page, run a temporary local HTTP server on port 8888 to receive the OAuth callback
 - **First-run bootstrap:** If no `client_id` in config, prompt user in a simple dialog to paste their `client_id` before starting OAuth
 
@@ -58,7 +58,7 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
 
 ### Playlist Endpoints (V2)
 
-- `GET /v1/me/playlists` — list user's playlists (for playlist picker). Filter to only show playlists owned by current user (writable).
+- `GET /v1/me/playlists` — list user's playlists (for playlist picker). Filter to only show playlists owned by current user (not followed/collaborative ones).
 - `POST /v1/playlists/{playlist_id}/items` — add current track to playlist (uses `item.uri` from player state). The `/tracks` endpoint is deprecated.
 
 ---
@@ -129,7 +129,7 @@ PyQt6 Signals/Slots:
 +--------------------------------------------+
 ```
 
-V1 hover: only show ✕ close button. V2: add full control row.
+V1: hover shows ✕ close button only (must have a way to close the app). V2: hover adds the full control row below the song info.
 
 ### Visual Style
 
@@ -178,18 +178,25 @@ V1 hover: only show ✕ close button. V2: add full control row.
 
 The local timer interpolates between polls. Each Spotify poll resyncs the local estimate. Detected seek jumps (progress jumps > 3 seconds from expected) trigger immediate resync.
 
-### Per-second Spotify Poll Cycle (worker thread)
+### Per-second Spotify Poll Cycle (Spotify worker thread)
 
 1. Call `GET /v1/me/player/currently-playing`
 2. If `currently_playing_type` is not `track` → emit "not a track" signal, skip everything below
 3. Compare `item.id` to previous track ID
-4. **Track changed?**
-   - Check session cache first. If cache miss:
-   - Query lrclib: `GET /api/get?track_name=...&artist_name=...&album_name=...&duration=<seconds>`
-   - Has `syncedLyrics` → parse into sorted `[(ms, text), ...]`, cache result
-   - No result or no `syncedLyrics` → try `GET /api/search`, rank results, cache result
-   - Still nothing → cache "no lyrics" for this track ID
+4. **Track changed?** → emit `track_changed(track_info)` signal (lyrics worker picks this up independently)
 5. Emit `state_synced(progress_ms, is_playing, local_timestamp)` → UI resyncs local timer
+6. Polling continues on schedule regardless of whether lyrics lookup is still pending
+
+### Lyrics Lookup (Lyrics worker thread, triggered by track_changed signal)
+
+1. Receive `track_changed(track_info)`
+2. Check session cache by track ID. If cache hit → emit `lyrics_ready`, done.
+3. Cache miss → query lrclib: `GET /api/get?track_name=...&artist_name=...&album_name=...&duration=<seconds>`
+4. Has `syncedLyrics` → parse into sorted `[(ms, text), ...]`, cache result, emit `lyrics_ready`
+5. No result or no `syncedLyrics` → try `GET /api/search`, rank results
+6. Found acceptable match → cache result, emit `lyrics_ready`
+7. Successful response but no synced lyrics anywhere → cache "no lyrics" for this track ID, emit `no_lyrics`
+8. Network error / timeout / 5xx → do NOT cache. Display temporary "unavailable" state. Allow retry on next visit to this track.
 
 ### Local UI Timer Cycle (main thread, ~150ms)
 
@@ -208,10 +215,11 @@ Binary search on the sorted timestamp list. Find the last entry where `timestamp
 
 | Scenario | Behavior |
 |---|---|
-| Token expired (HTTP 401) | Auto-refresh with refresh token (save new refresh token from PKCE), retry the failed request |
+| Token expired (HTTP 401) | Auto-refresh with refresh token. If response includes new refresh_token, save it; otherwise keep existing. Retry the failed request. |
 | Refresh token invalid | Show prompt "please re-authorize", restart PKCE OAuth flow |
 | Network disconnected (cannot reach Spotify) | Freeze on last state, show offline indicator icon, retry every 5 seconds |
-| lrclib query fails (timeout / 5xx) | Cache as "no lyrics" for this track ID, display "no synced lyrics". Next track change will query for the new track. |
+| lrclib query fails (timeout / 5xx) | Display temporary "lyrics unavailable" state. Do NOT cache this failure. Allow retry if user returns to this track later. |
+| lrclib returns success but no syncedLyrics | Cache "no lyrics" for this track ID. Display "no synced lyrics". |
 | Spotify not playing anything | Display "not playing", progress bar at zero, continue polling |
 | Non-track playback (podcast / ad) | Display "not a track", hide progress bar, skip lyrics/playlist logic |
 | Playback control API fails (V2) | Silent failure (user notices via Spotify app) |
@@ -276,9 +284,8 @@ Add after V1 is stable:
 
 1. Hover-to-reveal control row (play/pause, next, prev)
 2. Add-to-playlist button with remembered default
-3. Playlist picker dropdown (writable playlists only)
-4. Close button on hover
-5. Additional OAuth scopes (`user-modify-playback-state`, playlist scopes)
+3. Playlist picker dropdown (owned playlists only)
+4. Additional OAuth scopes (`user-modify-playback-state`, playlist scopes)
 
 ### V3 — Packaging
 
