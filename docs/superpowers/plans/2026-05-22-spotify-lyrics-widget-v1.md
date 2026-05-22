@@ -764,6 +764,38 @@ class TestDetectChanges:
         new = self._make_state()
         changes = detect_changes(None, new)
         assert changes["track_changed"] is True
+
+
+class TestSpotifyWorker401:
+    @patch("src.spotify_worker.httpx.get")
+    @patch("src.spotify_worker.refresh_access_token")
+    def test_401_triggers_refresh_and_retry(self, mock_refresh, mock_get):
+        from src.spotify_worker import SpotifyWorker
+        from unittest.mock import PropertyMock
+
+        mock_config = MagicMock()
+        mock_config.access_token = "old_token"
+        mock_config.refresh_token = "refresh"
+        mock_config.client_id = "client"
+        mock_config.token_expires_at = 0  # expired
+
+        mock_refresh.return_value = {
+            "access_token": "new_token",
+            "expires_in": 3600,
+        }
+        mock_get.side_effect = [
+            MagicMock(status_code=401),  # first call fails
+            MagicMock(  # retry succeeds
+                status_code=200,
+                text='{"is_playing": false}',
+                json=lambda: {"is_playing": False, "progress_ms": None, "currently_playing_type": "unknown", "item": None},
+            ),
+        ]
+
+        worker = SpotifyWorker(mock_config)
+        response = worker._make_spotify_request()
+        assert response.status_code == 200
+        mock_refresh.assert_called()
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -877,12 +909,15 @@ class SpotifyWorker(QThread):
     not_a_track = pyqtSignal()
     not_playing = pyqtSignal()
     auth_expired = pyqtSignal()
+    network_error = pyqtSignal()
+    network_recovered = pyqtSignal()
 
     def __init__(self, config):
         super().__init__()
         self._config = config
         self._running = True
         self._previous_state: PlayerState | None = None
+        self._network_failed = False
 
     def stop(self):
         self._running = False
@@ -891,25 +926,40 @@ class SpotifyWorker(QThread):
         while self._running:
             try:
                 self._poll_once()
+                if self._network_failed:
+                    self._network_failed = False
+                    self.network_recovered.emit()
+            except (httpx.ConnectError, httpx.TimeoutException):
+                if not self._network_failed:
+                    self._network_failed = True
+                    self.network_error.emit()
             except Exception:
-                pass  # Network errors handled silently, retry next cycle
+                pass
             self.msleep(1000)
 
-    def _poll_once(self):
-        # Check token expiry and refresh if needed
+    def _refresh_token(self) -> bool:
+        """Attempt to refresh the access token. Returns True on success."""
+        try:
+            result = refresh_access_token(
+                self._config.refresh_token, self._config.client_id
+            )
+            self._config.access_token = result["access_token"]
+            self._config.token_expires_at = int(time.time()) + result["expires_in"]
+            if "refresh_token" in result:
+                self._config.refresh_token = result["refresh_token"]
+            self._config.save()
+            return True
+        except Exception:
+            return False
+
+    def _make_spotify_request(self):
+        """Make the currently-playing request. Handle 401 with refresh+retry.
+        Returns response or None if auth is unrecoverable."""
+        # Proactive refresh if token is about to expire
         if is_token_expired(self._config.token_expires_at):
-            try:
-                result = refresh_access_token(
-                    self._config.refresh_token, self._config.client_id
-                )
-                self._config.access_token = result["access_token"]
-                self._config.token_expires_at = int(time.time()) + result["expires_in"]
-                if "refresh_token" in result:
-                    self._config.refresh_token = result["refresh_token"]
-                self._config.save()
-            except Exception:
+            if not self._refresh_token():
                 self.auth_expired.emit()
-                return
+                return None
 
         response = httpx.get(
             CURRENTLY_PLAYING_URL,
@@ -917,11 +967,29 @@ class SpotifyWorker(QThread):
             timeout=5.0,
         )
 
+        # Handle 401: force refresh and retry once
         if response.status_code == 401:
-            self.auth_expired.emit()
-            return
+            if not self._refresh_token():
+                self.auth_expired.emit()
+                return None
+            response = httpx.get(
+                CURRENTLY_PLAYING_URL,
+                headers={"Authorization": f"Bearer {self._config.access_token}"},
+                timeout=5.0,
+            )
+            if response.status_code == 401:
+                self.auth_expired.emit()
+                return None
 
-        if response.status_code == 204 or response.status_code == 200 and not response.text:
+        return response
+
+    def _poll_once(self):
+
+        response = self._make_spotify_request()
+        if response is None:
+            return  # auth_expired already emitted
+
+        if response.status_code == 204 or (response.status_code == 200 and not response.text):
             self.not_playing.emit()
             self._previous_state = None
             return
@@ -1070,6 +1138,39 @@ class TestFetchLyrics:
         with pytest.raises(httpx.ConnectError):
             fetch_lyrics_from_lrclib(info)
 
+    @patch("src.lyrics_worker.httpx.get")
+    def test_5xx_raises_unavailable(self, mock_get):
+        from src.lyrics_worker import LrclibUnavailableError
+        mock_get.return_value = MagicMock(status_code=503)
+        info = TrackInfo(
+            track_id="t1",
+            track_name="Song",
+            artist_name="Artist",
+            album_name="Album",
+            duration_ms=180000,
+        )
+        import pytest
+        with pytest.raises(LrclibUnavailableError):
+            fetch_lyrics_from_lrclib(info)
+
+    @patch("src.lyrics_worker.httpx.get")
+    def test_search_5xx_raises_unavailable(self, mock_get):
+        from src.lyrics_worker import LrclibUnavailableError
+        mock_get.side_effect = [
+            MagicMock(status_code=404, json=lambda: {}),  # exact match: not found
+            MagicMock(status_code=500),  # search: server error
+        ]
+        info = TrackInfo(
+            track_id="t1",
+            track_name="Song",
+            artist_name="Artist",
+            album_name="Album",
+            duration_ms=180000,
+        )
+        import pytest
+        with pytest.raises(LrclibUnavailableError):
+            fetch_lyrics_from_lrclib(info)
+
 
 class TestRankSearchResults:
     def test_prefers_closest_duration(self):
@@ -1105,6 +1206,28 @@ class TestRankSearchResults:
     def test_empty_results(self):
         best = rank_search_results([], target_duration_s=180, target_track="Song", target_artist="Artist")
         assert best is None
+
+    def test_normalized_matching_ignores_punctuation(self):
+        results = [
+            {"syncedLyrics": "[00:01.00] A", "trackName": "Don't Stop Me Now", "artistName": "Queen", "duration": 180},
+        ]
+        best = rank_search_results(results, target_duration_s=180, target_track="Dont Stop Me Now", target_artist="Queen")
+        assert best is not None
+
+    def test_normalized_matching_ignores_remaster_suffix(self):
+        results = [
+            {"syncedLyrics": "[00:01.00] A", "trackName": "Bohemian Rhapsody - Remastered 2011", "artistName": "Queen", "duration": 355},
+        ]
+        best = rank_search_results(results, target_duration_s=354, target_track="Bohemian Rhapsody", target_artist="Queen")
+        assert best is not None
+
+    def test_prefers_exact_name_over_partial(self):
+        results = [
+            {"syncedLyrics": "[00:01.00] A", "trackName": "Hello", "artistName": "Adele", "duration": 180},
+            {"syncedLyrics": "[00:01.00] B", "trackName": "Hello World", "artistName": "Adele", "duration": 180},
+        ]
+        best = rank_search_results(results, target_duration_s=180, target_track="Hello", target_artist="Adele")
+        assert best["trackName"] == "Hello"
 
 
 class TestLyricsCache:
@@ -1156,6 +1279,11 @@ LRCLIB_BASE = "https://lrclib.net/api"
 DURATION_TOLERANCE_S = 5
 
 
+class LrclibUnavailableError(Exception):
+    """Raised when lrclib returns a transient server error (5xx, timeout)."""
+    pass
+
+
 @dataclass
 class TrackInfo:
     track_id: str
@@ -1188,6 +1316,17 @@ class LyricsCache:
         self._store[track_id] = self.NO_LYRICS
 
 
+def _normalize(text: str) -> str:
+    """Normalize text for fuzzy comparison: lowercase, strip punctuation and extra whitespace."""
+    import re
+    text = text.lower()
+    text = re.sub(r"[^\w\s]", "", text)  # remove punctuation
+    text = re.sub(r"\s+", " ", text).strip()  # collapse whitespace
+    # Remove common suffixes like "remaster", "deluxe", "live", "remix"
+    text = re.sub(r"\b(remaster(ed)?|deluxe|live|remix|version|edit|original)\b", "", text)
+    return text.strip()
+
+
 def rank_search_results(
     results: list[dict],
     target_duration_s: int,
@@ -1195,6 +1334,9 @@ def rank_search_results(
     target_artist: str,
 ) -> dict | None:
     """Rank lrclib search results. Return best match or None."""
+    norm_track = _normalize(target_track)
+    norm_artist = _normalize(target_artist)
+
     candidates = []
     for r in results:
         if not r.get("syncedLyrics"):
@@ -1203,10 +1345,12 @@ def rank_search_results(
         duration_diff = abs(duration - target_duration_s)
         if duration_diff > DURATION_TOLERANCE_S:
             continue
-        # Simple scoring: lower is better
-        name_match = 0 if r.get("trackName", "").lower() == target_track.lower() else 1
-        artist_match = 0 if r.get("artistName", "").lower() == target_artist.lower() else 1
-        score = duration_diff + name_match * 10 + artist_match * 10
+        # Normalized closeness scoring: lower is better
+        r_track = _normalize(r.get("trackName", ""))
+        r_artist = _normalize(r.get("artistName", ""))
+        name_match = 0 if r_track == norm_track else (5 if norm_track in r_track or r_track in norm_track else 10)
+        artist_match = 0 if r_artist == norm_artist else (5 if norm_artist in r_artist or r_artist in norm_artist else 10)
+        score = duration_diff + name_match + artist_match
         candidates.append((score, r))
 
     if not candidates:
@@ -1219,21 +1363,29 @@ def rank_search_results(
 def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
     """Fetch synced lyrics from lrclib.net. Returns parsed lines or None.
 
-    Raises httpx exceptions on network errors (caller decides whether to cache).
+    Returns None when lrclib confirms no synced lyrics exist for this track.
+    Raises LrclibUnavailableError on 5xx or timeout (transient — do not cache).
+    Raises httpx.ConnectError on network failure (transient — do not cache).
     """
     duration_s = info.duration_ms // 1000
 
     # 1. Try exact match
-    response = httpx.get(
-        f"{LRCLIB_BASE}/get",
-        params={
-            "track_name": info.track_name,
-            "artist_name": info.artist_name,
-            "album_name": info.album_name,
-            "duration": duration_s,
-        },
-        timeout=5.0,
-    )
+    try:
+        response = httpx.get(
+            f"{LRCLIB_BASE}/get",
+            params={
+                "track_name": info.track_name,
+                "artist_name": info.artist_name,
+                "album_name": info.album_name,
+                "duration": duration_s,
+            },
+            timeout=5.0,
+        )
+    except httpx.TimeoutException as e:
+        raise LrclibUnavailableError(f"lrclib timeout: {e}") from e
+
+    if response.status_code >= 500:
+        raise LrclibUnavailableError(f"lrclib server error: {response.status_code}")
 
     if response.status_code == 200:
         data = response.json()
@@ -1242,14 +1394,20 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
             return parse_lrc(synced)
 
     # 2. Fallback: search
-    response = httpx.get(
-        f"{LRCLIB_BASE}/search",
-        params={
-            "track_name": info.track_name,
-            "artist_name": info.artist_name,
-        },
-        timeout=5.0,
-    )
+    try:
+        response = httpx.get(
+            f"{LRCLIB_BASE}/search",
+            params={
+                "track_name": info.track_name,
+                "artist_name": info.artist_name,
+            },
+            timeout=5.0,
+        )
+    except httpx.TimeoutException as e:
+        raise LrclibUnavailableError(f"lrclib search timeout: {e}") from e
+
+    if response.status_code >= 500:
+        raise LrclibUnavailableError(f"lrclib search server error: {response.status_code}")
 
     if response.status_code == 200:
         results = response.json()
@@ -1311,9 +1469,10 @@ class LyricsWorker(QThread):
                     self._cache.set(track_id, result)
                     self.lyrics_ready.emit(track_id, result)
                 else:
+                    # Confirmed no synced lyrics — safe to cache
                     self._cache.set_no_lyrics(track_id)
                     self.no_lyrics.emit(track_id)
-            except (httpx.ConnectError, httpx.TimeoutException, httpx.HTTPError):
+            except (httpx.ConnectError, LrclibUnavailableError):
                 # Transient failure — do NOT cache
                 self.lyrics_unavailable.emit(track_id)
 ```
@@ -1578,20 +1737,20 @@ class LyricsWidget(QWidget):
 
     def show_no_lyrics(self):
         self._lyrics = []
-        self._lyric_label.setText("♫ no synced lyrics")
+        self._lyric_label.setText("no synced lyrics")
 
     def show_not_playing(self):
         self._lyrics = []
-        self._lyric_label.setText("⏸ not playing")
+        self._lyric_label.setText("not playing")
         self.update_progress(0)
 
     def show_not_a_track(self):
         self._lyrics = []
-        self._lyric_label.setText("• not a track")
+        self._lyric_label.setText("not a track")
 
     def show_unavailable(self):
         self._lyrics = []
-        self._lyric_label.setText("⚠ lyrics unavailable")
+        self._lyric_label.setText("lyrics unavailable")
 
     # --- Private ---
 
@@ -1731,12 +1890,12 @@ def run_oauth_flow(client_id: str) -> dict:
     challenge = generate_code_challenge(verifier)
     state = secrets.token_urlsafe(16)
 
-    auth_url = build_auth_url(client_id, challenge, state)
-    webbrowser.open(auth_url)
-
-    # Start local server and wait for callback
+    # Bind server BEFORE opening browser to avoid race condition
     server = HTTPServer(("127.0.0.1", CALLBACK_PORT), _CallbackHandler)
     server.timeout = 120  # 2 minute timeout
+
+    auth_url = build_auth_url(client_id, challenge, state)
+    webbrowser.open(auth_url)
 
     # Block until one request is received
     server.handle_request()
@@ -1909,8 +2068,13 @@ class App(QObject):
 
     @pyqtSlot()
     def _on_auth_expired(self):
+        # Worker emits this only after refresh+retry failed inside the worker.
+        # Stop old worker, re-auth, create a fresh worker.
         self._spotify_worker.stop()
+        self._spotify_worker.wait(2000)
         if self._ensure_auth():
+            self._spotify_worker = SpotifyWorker(self._config)
+            self._connect_signals()
             self._spotify_worker.start()
 
     @pyqtSlot(str, list)
@@ -2022,7 +2186,7 @@ In `SpotifyWorker._poll_once()`, track consecutive failures and emit signals. In
         self._spotify_worker.network_recovered.connect(self._widget.hide_offline)
 ```
 
-- [ ] **Step 3: Test offline indicator**
+- [ ] **Step 3: Test offline indicator and worker network signals**
 
 ```python
 # Add to tests/test_widget.py
@@ -2034,6 +2198,52 @@ def test_offline_indicator(qtbot):
     assert widget._offline_label.isVisible()
     widget.hide_offline()
     assert not widget._offline_label.isVisible()
+```
+
+```python
+# Add to tests/test_spotify_worker.py
+
+class TestSpotifyWorkerNetworkError:
+    @patch("src.spotify_worker.httpx.get")
+    def test_network_error_emits_signal(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+        mock_get.side_effect = httpx.ConnectError("No internet")
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600  # valid token
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        signals = []
+        worker.network_error.connect(lambda: signals.append("error"))
+
+        # Calling _poll_once should not crash, error handled internally
+        worker._poll_once()
+        # Worker continues running (doesn't crash)
+
+    @patch("src.spotify_worker.httpx.get")
+    def test_recovery_after_network_error(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+        # First call fails, second succeeds
+        mock_get.side_effect = [
+            httpx.ConnectError("No internet"),
+            MagicMock(status_code=204, text=""),
+        ]
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        signals = []
+        worker.network_recovered.connect(lambda: signals.append("recovered"))
+
+        worker._poll_once()  # fails
+        worker._poll_once()  # recovers
+
+
+import httpx
+import time
 ```
 
 - [ ] **Step 4: Run all tests**
@@ -2080,9 +2290,9 @@ python -m src.main
 
 - [ ] **Step 2: Fix any issues found during manual testing**
 
-- [ ] **Step 3: Final commit**
+- [ ] **Step 3: Final commit (only if there are fixes from manual testing)**
 
 ```bash
-git add -A
-git commit -m "chore: V1 lyrics core complete — all manual tests passing"
+git add src/ tests/
+git commit -m "fix: address issues found during manual integration testing"
 ```
