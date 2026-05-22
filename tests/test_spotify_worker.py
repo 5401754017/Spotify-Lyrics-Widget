@@ -152,3 +152,52 @@ class TestSpotifyWorker401:
         response = worker._make_spotify_request()
         assert response.status_code == 200
         mock_refresh.assert_called()
+
+
+class TestSpotifyWorkerNetworkError:
+    @patch("src.spotify_worker.httpx.get")
+    def test_network_error_emits_signal(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_get.side_effect = httpx.ConnectError("No internet")
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        error_signals = []
+        worker.network_error.connect(lambda: error_signals.append("error"))
+
+        worker._poll_once()
+        assert len(error_signals) == 1
+
+        worker._poll_once()
+        assert len(error_signals) == 1
+
+    @patch("src.spotify_worker.httpx.get")
+    def test_recovery_after_network_error(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_get.side_effect = [
+            httpx.ConnectError("No internet"),
+            MagicMock(status_code=204, text=""),
+        ]
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        error_signals = []
+        recovered_signals = []
+        worker.network_error.connect(lambda: error_signals.append("error"))
+        worker.network_recovered.connect(
+            lambda: recovered_signals.append("recovered")
+        )
+
+        worker._poll_once()
+        assert len(error_signals) == 1
+
+        worker._poll_once()
+        assert len(recovered_signals) == 1

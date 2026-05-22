@@ -73,6 +73,13 @@ class LyricsWidget(QWidget):
         top_row.addWidget(self._close_btn)
         layout.addLayout(top_row)
 
+        self._offline_label = QLabel("! offline")
+        self._offline_label.setFont(QFont("Segoe UI", 8))
+        self._offline_label.setStyleSheet("color: #FF6B6B;")
+        self._offline_label.setAlignment(Qt.AlignmentFlag.AlignRight)
+        self._offline_label.setVisible(False)
+        layout.insertWidget(0, self._offline_label)
+
         self._lyric_label = QLabel("")
         self._lyric_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         self._lyric_label.setStyleSheet(f"color: {SPOTIFY_GREEN};")
@@ -147,6 +154,12 @@ class LyricsWidget(QWidget):
     def show_unavailable(self):
         self._lyrics = []
         self._lyric_label.setText("lyrics unavailable")
+
+    def show_offline(self):
+        self._offline_label.setVisible(True)
+
+    def hide_offline(self):
+        self._offline_label.setVisible(False)
 
     def _on_ui_tick(self):
         if not self._is_playing or not self._lyrics:

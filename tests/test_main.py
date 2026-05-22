@@ -40,3 +40,16 @@ def test_lyrics_ready_ignores_stale_track_result():
 
     app._on_lyrics_ready("current", [(5000, "current")])
     widget.set_lyrics.assert_called_once_with([(5000, "current")])
+
+
+def test_connect_signals_wires_offline_indicator():
+    app, _, widget = _make_app()
+
+    app._connect_signals()
+
+    app._spotify_worker.network_error.connect.assert_called_once_with(
+        widget.show_offline
+    )
+    app._spotify_worker.network_recovered.connect.assert_called_once_with(
+        widget.hide_offline
+    )

@@ -82,6 +82,8 @@ class App(QObject):
         self._spotify_worker.not_a_track.connect(self._on_not_a_track)
         self._spotify_worker.not_playing.connect(self._on_not_playing)
         self._spotify_worker.auth_expired.connect(self._on_auth_expired)
+        self._spotify_worker.network_error.connect(self._widget.show_offline)
+        self._spotify_worker.network_recovered.connect(self._widget.hide_offline)
 
         self._lyrics_worker.lyrics_ready.connect(self._on_lyrics_ready)
         self._lyrics_worker.no_lyrics.connect(self._on_no_lyrics)

@@ -72,3 +72,13 @@ def test_resync_local_timer(qtbot):
     widget.resync_local_timer(7000, True, time.monotonic())
     assert widget._last_synced_ms == 7000
     assert widget._is_playing is True
+
+
+def test_offline_indicator(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    widget.show_offline()
+    assert widget._offline_label.isVisible()
+    widget.hide_offline()
+    assert not widget._offline_label.isVisible()
