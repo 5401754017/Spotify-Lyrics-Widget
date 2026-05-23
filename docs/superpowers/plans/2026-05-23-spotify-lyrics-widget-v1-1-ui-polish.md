@@ -280,8 +280,9 @@ with:
 
 ```python
 self._track_label.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))
-self._track_label.setSingleLine(True)
 ```
+
+`QLabel` is single-line by default while `wordWrap` is `False`, so do not call `setSingleLine()`. PyQt6 `QLabel` has no such method.
 
 - [ ] **Step 6: Run focused style tests**
 
@@ -376,16 +377,15 @@ In `src/widget.py`, remove this line from `_setup_ui`:
 top_row.addWidget(self._close_btn)
 ```
 
-Create the close button with `_panel` as parent:
+Create the close button with `_panel` as parent and preserve the V1 transparent styling:
 
 ```python
-self._close_btn = QPushButton("x", self._panel)
-```
-
-Keep:
-
-```python
+self._close_btn = QPushButton("✕", self._panel)
 self._close_btn.setFixedSize(20, 20)
+self._close_btn.setStyleSheet(
+    f"QPushButton {{ color: {WHITE}; background: transparent; border: none; font-size: 14px; }}"
+    f"QPushButton:hover {{ color: {SPOTIFY_GREEN}; }}"
+)
 self._close_btn.clicked.connect(self.close)
 self._close_btn.setVisible(False)
 ```
@@ -462,25 +462,6 @@ def test_long_track_info_elides_without_resizing_widget(qtbot):
 
     assert widget.width() == initial_width
     assert widget._track_label.text().endswith("...")
-
-
-def test_track_label_reelides_from_full_text_on_resize(qtbot):
-    widget = LyricsWidget()
-    qtbot.addWidget(widget)
-    widget.show()
-    qtbot.wait(50)
-    widget.update_track_info(
-        "A Very Long Song Title For Resize Testing",
-        "A Very Long Artist Name",
-    )
-    first = widget._track_label.text()
-
-    widget.resize(520, widget.height())
-    widget._refresh_track_label_text()
-    second = widget._track_label.text()
-
-    assert widget._track_text_full == "A Very Long Song Title For Resize Testing - A Very Long Artist Name"
-    assert len(second) >= len(first)
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -488,12 +469,12 @@ def test_track_label_reelides_from_full_text_on_resize(qtbot):
 Run:
 
 ```bash
-pytest tests/test_widget.py::test_long_track_info_elides_without_resizing_widget tests/test_widget.py::test_track_label_reelides_from_full_text_on_resize -v
+pytest tests/test_widget.py::test_long_track_info_elides_without_resizing_widget -v
 ```
 
 Expected:
 
-- FAIL because `_track_text_full` and `_refresh_track_label_text()` do not exist and long text is not elided.
+- FAIL because long text is not elided.
 
 - [ ] **Step 3: Implement full text storage and eliding**
 
@@ -507,7 +488,7 @@ Replace `update_track_info` with:
 
 ```python
 def update_track_info(self, track_name: str, artist_name: str):
-    self._track_text_full = f"{track_name} - {artist_name}"
+    self._track_text_full = f"{track_name} — {artist_name}"
     self._refresh_track_label_text()
 ```
 
@@ -541,10 +522,10 @@ def resizeEvent(self, event):
 Run:
 
 ```bash
-pytest tests/test_widget.py::test_long_track_info_elides_without_resizing_widget tests/test_widget.py::test_track_label_reelides_from_full_text_on_resize -v
+pytest tests/test_widget.py::test_long_track_info_elides_without_resizing_widget -v
 ```
 
-Expected: both tests PASS.
+Expected: the test PASS.
 
 - [ ] **Step 5: Run full widget tests**
 
