@@ -201,3 +201,35 @@ class TestSpotifyWorkerNetworkError:
 
         worker._poll_once()
         assert len(recovered_signals) == 1
+
+
+class TestSpotifyWorkerIdleResponse:
+    @patch("src.spotify_worker.httpx.get")
+    def test_204_emits_not_playing_and_resets_previous_state(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_get.return_value = MagicMock(status_code=204, text="")
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        worker._previous_state = PlayerState(
+            track_id="old",
+            track_name="Old Song",
+            track_uri="spotify:track:old",
+            artist_name="Old Artist",
+            album_name="Old Album",
+            duration_ms=200000,
+            progress_ms=10000,
+            is_playing=True,
+            is_track=True,
+        )
+        signals = []
+        worker.not_playing.connect(lambda: signals.append("not_playing"))
+
+        worker._poll_once()
+
+        assert signals == ["not_playing"]
+        assert worker._previous_state is None
