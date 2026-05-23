@@ -22,8 +22,8 @@ This is a V1.1 visual polish pass. V1 already proves auth, Spotify polling, lyri
 - Larger and slightly bolder song / artist text.
 - Preserve one-line synced lyrics as the primary visual focus.
 - Prevent track title, artist, and lyric layout from shifting when hovering.
+- Elide long track / artist text so it cannot overflow or resize the widget.
 - Keep close button available on hover.
-- Optional small centered drag handle inspired by compact system overlay controls.
 - Tests for no-jump hover behavior and typography/style invariants.
 
 ### Out of Scope
@@ -44,17 +44,18 @@ The widget should feel like a compact desktop overlay, closer to a small polishe
 
 Target look:
 
-- Background: very dark gray / near-black panel, for example `#090909`.
+- Background: Spotify dark gray `#121212`.
 - Border: `1px` Spotify green `#1DB954`.
 - Corner radius: `10-14px`.
 - Padding: enough breathing room so text and progress do not touch the edge.
 - Progress bar: still 2px, but inset from the rounded border.
-- Track / artist: white, `Segoe UI` or system sans, size `10-11`, medium / demi-bold weight.
+- Track / artist: white, `Segoe UI` or system sans, size `10-11`, `QFont.Weight.DemiBold` (600).
 - Lyric: Spotify green, size around `16-17`, bold, centered.
 - Close button: top-right, hover-only visual, but it must not affect layout.
-- Drag handle: optional short gray pill centered near the top, purely visual and still draggable.
 
 The existing Spotify black-green identity stays, but the result should be less sharp and less like a rectangular HUD.
+
+No decorative drag handle in V1.1. The full panel remains draggable by clicking and holding anywhere on the widget.
 
 ---
 
@@ -93,12 +94,14 @@ Keep `src/widget.py` as the only production UI file for this pass.
 Recommended structure:
 
 - Use a transparent outer `LyricsWidget` window.
+- Set `Qt.WidgetAttribute.WA_TranslucentBackground` to `True` on the outer `LyricsWidget`.
+- The outer widget stylesheet must be transparent, not black.
 - Add an inner panel widget or frame with object name like `lyricsPanel`.
 - Apply stylesheet to the panel:
 
 ```css
 #lyricsPanel {
-  background-color: #090909;
+  background-color: #121212;
   border: 1px solid #1DB954;
   border-radius: 12px;
 }
@@ -123,6 +126,23 @@ Recommended structure:
 
 ---
 
+## Long Text Handling
+
+- Track / artist label: single line. If the text exceeds the available label width, elide on the right with `...`.
+- Track / artist eliding should update when the widget is resized or when track info changes.
+- Store the full unelided track label text separately so resizing can re-elide from the original string.
+- Lyric label: keep word wrap enabled. If one lyric line becomes taller than roughly three visual lines, accept it as a known limitation for V1.1. Do not add scrolling, font shrinking, or a marquee.
+
+---
+
+## Remaining V1 Fixes To Include
+
+- Add a Spotify worker test for the `204 No Content` currently-playing response. It should assert `not_playing` emits and `_previous_state` resets to `None`.
+- Add long track / artist eliding as part of the V1.1 typography work.
+- Keep the known `LyricsWorker.request_lyrics()` narrow race in mind, but do not change it in V1.1 unless a reproducible lyrics-not-loading bug appears.
+
+---
+
 ## Testing
 
 Update existing widget tests rather than creating a broad new test suite.
@@ -132,9 +152,12 @@ Add or adjust tests for:
 - Widget still creates and has frameless / always-on-top flags.
 - Track label font is larger or bolder than V1.
 - Rounded panel style includes a border radius and green border.
+- Outer widget uses translucent background while the inner panel owns the visible background.
+- Long track / artist text elides instead of expanding or overflowing the widget.
 - Hovering does not change `_track_label.geometry()`.
 - Hovering does not change `_lyric_label.geometry()`.
 - Close button still appears on hover and hides on leave.
+- Spotify worker handles `204 No Content` by emitting `not_playing` and clearing previous state.
 - Existing progress, no lyrics, not playing, offline indicator tests still pass.
 
 Manual check:
@@ -145,6 +168,7 @@ Manual check:
 - Confirm rounded corners and green outline are visible.
 - Confirm dragging still works from the main panel.
 - Confirm close button is usable.
+- Confirm a long title / artist line does not resize the widget or overlap the close button.
 
 ---
 
@@ -157,4 +181,3 @@ Reason:
 - It improves the already-working V1 widget.
 - It does not require new Spotify scopes or new user workflows.
 - V2 should stay focused on playback controls and playlist behavior.
-
