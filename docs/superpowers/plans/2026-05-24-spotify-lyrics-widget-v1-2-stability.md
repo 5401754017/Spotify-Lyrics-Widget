@@ -6,8 +6,9 @@
 
 **Goal:** Make the widget stable and predictable — hide the console (with a log safety
 net), stop the title/lyric from jumping, fix the clipped second lyric line, stop the
-offline indicator from pushing content, and prevent the multi-instance bug that broke
-"currently playing" detection. No new Spotify features.
+offline indicator from pushing content, prevent the multi-instance bug that broke
+"currently playing" detection, and back off properly when Spotify rate-limits us (429).
+No new Spotify features.
 
 **Tech:** Python 3.12, PyQt6. Touch `src/main.py`, `src/widget.py`, and add `src/logging_setup.py`.
 Add/adjust tests in `tests/`.
@@ -124,6 +125,29 @@ refresh, corrupting auth so none could read "currently playing". (We confirmed a
 VERIFY: open the widget; try to open a second → it focuses the first, no second process.
 Close it → no `python -m src.main` left in Task Manager. Open/close repeatedly → still
 detects the playing song.
+
+---
+
+## Task 6 — Honor Spotify rate limits (429 Retry-After)
+
+INTENT: The widget polls every 1 second and has NO handling for Spotify's `429 Too Many
+Requests`. A non-200 response is currently swallowed, so the widget just goes blank. During
+this work we hit a REAL 429 with `Retry-After` ≈ 15 hours, caused by the zombie +
+multi-instance hammering. The widget must back off, not keep hammering (which extends the
+ban).
+
+- In `src/spotify_worker.py`, handle `response.status_code == 429`:
+  - Read the `Retry-After` response header (seconds). Stop polling for that duration
+    (cap it sensibly, e.g. don't sleep the thread for 15h — sleep in short checks so
+    `stop()` still works), then resume. NEVER keep polling at 1s through a 429.
+  - Log the 429 and the Retry-After value (uses Task 1 logging).
+  - Emit a signal so the UI shows a "rate limited — retrying" state instead of going blank.
+- Optional: small exponential backoff on repeated 429s.
+- Together with Task 5 (single instance), this prevents the hammering that caused the ban.
+
+VERIFY: mock a 429 with a `Retry-After` header → the worker stops polling for that period,
+the UI shows a rate-limited state, and polling resumes afterward. Continuing to poll during
+a ban is the bug being fixed.
 
 ---
 
