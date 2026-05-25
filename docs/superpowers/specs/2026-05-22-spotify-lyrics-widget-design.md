@@ -36,7 +36,7 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
 - **Scopes required:**
   - V1 (core): `user-read-currently-playing`
   - V2 (controls): `user-modify-playback-state` (play/pause, next, prev)
-  - V2 (playlist): `playlist-modify-public`, `playlist-modify-private`, `playlist-read-private`
+  - Playlist phase (deferred, post-V2): `playlist-modify-public`, `playlist-modify-private`, `playlist-read-private`
 - **Token refresh:** Access token expires in 1 hour. Auto-refresh using refresh token before expiry. Spotify's refresh response may or may not include a new `refresh_token`. If present, save the new one. If absent, continue using the existing refresh token.
 - **First-time auth:** Open system browser to Spotify login page, run a temporary local HTTP server on port 8888 to receive the OAuth callback
 - **First-run bootstrap:** If no `client_id` in config, prompt user in a simple dialog to paste their `client_id` before starting OAuth
@@ -56,7 +56,7 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
 - `POST /v1/me/player/previous` — skip to previous
 - All require `user-modify-playback-state` scope and Spotify Premium
 
-### Playlist Endpoints (V2)
+### Playlist Endpoints (deferred phase, post-V2)
 
 - `GET /v1/me/playlists` — list user's playlists (for playlist picker). Filter to only show playlists owned by current user (not followed/collaborative ones).
 - `POST /v1/playlists/{playlist_id}/items` — add current track to playlist (uses `item.uri` from player state). The `/tracks` endpoint is deprecated.
@@ -72,9 +72,9 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
 | `auth` | V1 | Spotify PKCE OAuth flow, token storage, auto-refresh |
 | `spotify_player` | V1 | Poll currently playing track every 1s in a worker thread. Emit state-change signals. V2: expose playback control methods (play, pause, next, prev) |
 | `lyrics` | V1 | Query lrclib.net in a worker thread, parse LRC timestamps into sorted list of `(timestamp_ms, line_text)`. Cache results by Spotify track ID for the session. |
-| `playlist` | V2 | Fetch user's playlists, add track to playlist, manage default playlist memory |
-| `config` | V1 | Read/write JSON config file: client_id, tokens, window position (x, y). V2: default playlist ID |
-| `ui` | V1 | PyQt6 frameless always-on-top draggable window, lyric display, progress bar. V2: hover controls, playlist picker |
+| `playlist` | Deferred (post-V2) | Fetch user's playlists, add track to playlist, manage default playlist memory |
+| `config` | V1 | Read/write JSON config file: client_id, tokens, window position (x, y). Deferred phase: default playlist ID |
+| `ui` | V1 | PyQt6 frameless always-on-top draggable window, lyric display, progress bar. V2: hover playback controls + title marquee. Deferred phase: playlist picker |
 
 ### Dependency Direction
 
@@ -121,7 +121,7 @@ PyQt6 Signals/Slots:
 ```
 +--------------------------------------------+
 |         Song Name — Artist Name          ✕ |  ← close button appears top-right
-|       ⏮    ⏯    ⏭    ＋    📋           |  ← control row appears
+|            ⏮      ⏯      ⏭                |  ← playback control row appears
 |                                            |
 |        current lyric line here             |
 |                                            |
@@ -129,7 +129,7 @@ PyQt6 Signals/Slots:
 +--------------------------------------------+
 ```
 
-V1: hover shows ✕ close button only (must have a way to close the app). V2: hover adds the full control row below the song info.
+V1: hover shows ✕ close button only (must have a way to close the app). V2: hover adds the playback control row (play/pause, next, prev) below the song info. The ＋ / 📋 playlist buttons are deferred out of V2 (see "Playlist Add Feature" below).
 
 ### Visual Style
 
@@ -148,13 +148,18 @@ V1: hover shows ✕ close button only (must have a way to close the app). V2: ho
 - Always on top (`Qt.WindowStaysOnTopHint`)
 - Draggable by clicking and holding anywhere on the window
 - Position saved to config on close, restored on launch
-- No system tray integration. Close = exit the app.
+- System tray icon (added V1.3): running-status indicator, left-click raises the widget to
+  front, right-click menu (Show/Hide, Open log file, Quit). Closing/Quit still exits the app.
 
-### Playlist Add Feature
+### Playlist Add Feature (DEFERRED out of V2)
+
+Split out of V2 into its own later phase (roadmap, 2026-05-25): do playback controls +
+marquee first. When built later:
 
 - **Plus button (＋):** Adds current track to the remembered default playlist. First use requires selecting a playlist first.
 - **Playlist picker button (📋):** Opens a dropdown/popup listing user's playlists. Selecting one sets it as the new default target.
 - **Memory:** Default playlist ID persisted in config. Survives app restart.
+- Requires the playlist OAuth scopes — only requested when this phase is built, not in V2.
 
 ---
 
@@ -278,15 +283,16 @@ Prove the main idea works end-to-end:
 8. Config persistence (client_id, tokens, window position) in AppData
 9. Error handling for all V1 scenarios
 
-### V2 — Playback Controls & Playlist
+### V2 — Playback Controls & Title Marquee
 
-Add after V1 is stable:
+Add after V1.3. **Scope confirmed 2026-05-25: playback controls + marquee only.**
+Playlist add/picker is split out into a separate later phase (see "Playlist Add Feature"
+above) — do NOT build it in V2.
 
 1. Hover-to-reveal control row (play/pause, next, prev)
-2. Add-to-playlist button with remembered default
-3. Playlist picker dropdown (owned playlists only)
-4. Additional OAuth scopes (`user-modify-playback-state`, playlist scopes)
-5. Title rendering rework (folds in a decided V1.x polish):
+2. Additional OAuth scope: `user-modify-playback-state` only (playlist scopes deferred with
+   the playlist phase)
+3. Title rendering rework (folds in a decided V1.x polish):
    - **At rest: left-align the title.** It is currently set to `AlignCenter`, but the
      V1.1/V1.2 layout reserves a right-side overlay gutter (`OVERLAY_GUTTER_WIDTH`, for the
      ✕ close button + offline label) with no matching left gutter, so the centered title
@@ -317,7 +323,6 @@ This is a personal tool. If published publicly on GitHub, note that Spotify's AP
 
 - Lyrics translation
 - Mac / Linux support
-- System tray
 - Progress bar seek (drag to position)
 - Genius or other fallback lyrics sources
 - plainLyrics display
