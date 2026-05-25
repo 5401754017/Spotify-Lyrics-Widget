@@ -203,6 +203,66 @@ class TestSpotifyWorkerNetworkError:
         assert len(recovered_signals) == 1
 
 
+class TestSpotifyWorkerRateLimit:
+    @patch("src.spotify_worker.httpx.get")
+    def test_429_sets_retry_after_backoff_and_emits_signal(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_get.return_value = MagicMock(
+            status_code=429,
+            text="",
+            headers={"Retry-After": "30"},
+        )
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        signals = []
+        worker.rate_limited.connect(lambda seconds: signals.append(seconds))
+
+        with patch("src.spotify_worker.time.monotonic", return_value=100.0):
+            worker._poll_once()
+
+        assert signals == [30]
+        assert worker._rate_limited_until == 130.0
+
+    @patch("src.spotify_worker.httpx.get")
+    def test_rate_limit_backoff_skips_polling_until_retry_after(self, mock_get):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        worker._rate_limited_until = 130.0
+
+        with patch("src.spotify_worker.time.monotonic", return_value=120.0):
+            worker._poll_once()
+
+        mock_get.assert_not_called()
+
+    @patch("src.spotify_worker.logging.warning")
+    @patch("src.spotify_worker.httpx.get")
+    def test_429_logs_retry_after(self, mock_get, log_warning):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_get.return_value = MagicMock(
+            status_code=429,
+            text="",
+            headers={"Retry-After": "15"},
+        )
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        worker._poll_once()
+
+        log_warning.assert_called()
+
+
 class TestSpotifyWorkerIdleResponse:
     @patch("src.spotify_worker.httpx.get")
     def test_204_emits_not_playing_and_resets_previous_state(self, mock_get):

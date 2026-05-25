@@ -1,3 +1,4 @@
+import logging
 import time
 from dataclasses import dataclass
 
@@ -9,6 +10,7 @@ from src.auth import is_token_expired, refresh_access_token
 
 CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SEEK_THRESHOLD_MS = 3000
+DEFAULT_RETRY_AFTER_SECONDS = 1
 
 
 @dataclass
@@ -91,6 +93,7 @@ class SpotifyWorker(QThread):
     auth_expired = pyqtSignal()
     network_error = pyqtSignal()
     network_recovered = pyqtSignal()
+    rate_limited = pyqtSignal(int)
 
     def __init__(self, config):
         super().__init__()
@@ -98,6 +101,7 @@ class SpotifyWorker(QThread):
         self._running = True
         self._previous_state: PlayerState | None = None
         self._network_failed = False
+        self._rate_limited_until = 0.0
 
     def stop(self):
         self._running = False
@@ -105,7 +109,16 @@ class SpotifyWorker(QThread):
     def run(self):
         while self._running:
             self._poll_once()
-            self.msleep(1000)
+            self.msleep(self._next_sleep_ms())
+
+    def _next_sleep_ms(self) -> int:
+        if not self._is_rate_limited():
+            return 1000
+        remaining_ms = int((self._rate_limited_until - time.monotonic()) * 1000)
+        return max(100, min(remaining_ms, 1000))
+
+    def _is_rate_limited(self) -> bool:
+        return time.monotonic() < self._rate_limited_until
 
     def _refresh_token(self) -> bool:
         try:
@@ -119,6 +132,7 @@ class SpotifyWorker(QThread):
             self._config.save()
             return True
         except Exception:
+            logging.exception("Failed to refresh Spotify access token")
             return False
 
     def _make_spotify_request(self):
@@ -150,6 +164,9 @@ class SpotifyWorker(QThread):
         return response
 
     def _poll_once(self):
+        if self._is_rate_limited():
+            return
+
         try:
             response = self._make_spotify_request()
         except (httpx.ConnectError, httpx.TimeoutException):
@@ -158,6 +175,7 @@ class SpotifyWorker(QThread):
                 self.network_error.emit()
             return
         except Exception:
+            logging.exception("Unexpected error while polling Spotify")
             return
 
         if self._network_failed:
@@ -172,6 +190,16 @@ class SpotifyWorker(QThread):
         ):
             self.not_playing.emit()
             self._previous_state = None
+            return
+
+        if response.status_code == 429:
+            retry_after = self._parse_retry_after(response)
+            self._rate_limited_until = time.monotonic() + retry_after
+            logging.warning(
+                "Spotify rate limited polling; retrying after %s seconds",
+                retry_after,
+            )
+            self.rate_limited.emit(retry_after)
             return
 
         if response.status_code != 200:
@@ -191,3 +219,10 @@ class SpotifyWorker(QThread):
 
         self.state_synced.emit(state.progress_ms, state.is_playing, time.monotonic())
         self._previous_state = state
+
+    def _parse_retry_after(self, response) -> int:
+        try:
+            retry_after = int(response.headers.get("Retry-After", ""))
+        except (TypeError, ValueError):
+            retry_after = DEFAULT_RETRY_AFTER_SECONDS
+        return max(DEFAULT_RETRY_AFTER_SECONDS, retry_after)

@@ -49,6 +49,17 @@ def test_partial_config_preserves_defaults(tmp_path):
     assert config.window_x == 100
 
 
+def test_config_loads_utf8_bom_file(tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_bytes(
+        b"\xef\xbb\xbf" + json.dumps({"client_id": "bom-client"}).encode("utf-8")
+    )
+
+    config = Config(config_dir=tmp_path)
+
+    assert config.client_id == "bom-client"
+
+
 def test_default_appdata_path():
     config = Config()
     assert "spotify-lyrics-widget" in str(config._config_dir)

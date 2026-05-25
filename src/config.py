@@ -23,10 +23,14 @@ class Config:
         self._config_file = self._config_dir / "config.json"
         self._load()
 
+    @property
+    def config_dir(self) -> Path:
+        return self._config_dir
+
     def _load(self):
         data = {}
         if self._config_file.exists():
-            with open(self._config_file, "r", encoding="utf-8") as file:
+            with open(self._config_file, "r", encoding="utf-8-sig") as file:
                 data = json.load(file)
 
         for key, default in self._DEFAULTS.items():

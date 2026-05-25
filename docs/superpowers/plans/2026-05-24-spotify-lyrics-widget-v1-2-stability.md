@@ -41,8 +41,8 @@ still recorded somewhere — because right now errors vanish silently (that is w
 - Wrap `main()` startup in try/except: on any unhandled startup error, log it AND show a
   `QMessageBox.critical` so a no-console user still sees fatal failures.
 - Non-console launch: provide a `pythonw.exe`-based launch (e.g. a `run.pyw` entry or a
-  `.bat`/shortcut using `pythonw -m src.main`). Record that the eventual packaged build
-  (future V3) uses PyInstaller `--windowed`.
+  `.bat`/shortcut using `pythonw -m src.main`). V1.2 adds `run.pyw`; the eventual
+  packaged build (future V3) should use PyInstaller `--windowed`.
 
 VERIFY: launch via pythonw → no console window; force an error → it appears in widget.log
 and a fatal one shows a QMessageBox.

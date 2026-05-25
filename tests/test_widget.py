@@ -1,7 +1,7 @@
 import time
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QFont
+from PyQt6.QtGui import QCloseEvent, QFont
 
 from src.widget import LyricsWidget
 
@@ -67,6 +67,62 @@ def test_long_track_info_elides_without_resizing_widget(qtbot):
     assert widget._track_label.text().endswith("...")
 
 
+def test_widget_height_stays_fixed_for_one_two_and_long_lyrics(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.wait(50)
+    initial_height = widget.height()
+    initial_progress_y = widget._progress_bar.y()
+
+    widget.set_lyric_text("one line")
+    qtbot.wait(50)
+    one_line_height = widget.height()
+
+    widget.set_lyric_text("first line\nsecond line")
+    qtbot.wait(50)
+    two_line_height = widget.height()
+
+    widget.set_lyric_text("first line\nsecond line\nthird line")
+    qtbot.wait(50)
+
+    assert one_line_height == initial_height
+    assert two_line_height == initial_height
+    assert widget.height() == initial_height
+    assert widget._progress_bar.y() == initial_progress_y
+
+
+def test_lyric_label_lane_fits_exactly_two_lines(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    line_height = widget._lyric_label.fontMetrics().lineSpacing()
+
+    assert widget._lyric_label.minimumHeight() >= line_height * 2
+    assert widget._lyric_label.maximumHeight() == widget._lyric_label.minimumHeight()
+
+
+def test_show_event_refreshes_overlay_and_elided_title(qtbot, monkeypatch):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    calls = []
+
+    def record_refresh():
+        calls.append("refresh")
+
+    def record_position():
+        calls.append("position")
+
+    monkeypatch.setattr(widget, "_refresh_track_label_text", record_refresh)
+    monkeypatch.setattr(widget, "_position_overlay_controls", record_position)
+
+    widget.show()
+    qtbot.wait(50)
+
+    assert "refresh" in calls
+    assert "position" in calls
+
+
 def test_update_lyric_line(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
@@ -103,6 +159,17 @@ def test_close_button_visible_on_hover(qtbot):
     assert widget._close_btn.isVisible()
     widget._on_leave_hover()
     assert not widget._close_btn.isVisible()
+
+
+def test_close_event_emits_close_requested(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    signals = []
+    widget.close_requested.connect(lambda: signals.append("close"))
+
+    widget.closeEvent(QCloseEvent())
+
+    assert signals == ["close"]
 
 
 def _shown_widget(qtbot):
@@ -162,3 +229,41 @@ def test_offline_indicator(qtbot):
     assert widget._offline_label.isVisible()
     widget.hide_offline()
     assert not widget._offline_label.isVisible()
+
+
+def test_offline_indicator_does_not_move_content(qtbot):
+    widget = _shown_widget(qtbot)
+
+    track_geometry = widget._track_label.geometry()
+    lyric_geometry = widget._lyric_label.geometry()
+    progress_geometry = widget._progress_bar.geometry()
+
+    widget.show_offline()
+    qtbot.wait(50)
+
+    assert widget._track_label.geometry() == track_geometry
+    assert widget._lyric_label.geometry() == lyric_geometry
+    assert widget._progress_bar.geometry() == progress_geometry
+
+
+def test_offline_indicator_is_overlay_child_of_panel(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    assert widget._offline_label.parent() is widget._panel
+    assert widget._offline_label not in [
+        widget._panel.layout().itemAt(index).widget()
+        for index in range(widget._panel.layout().count())
+    ]
+
+
+def test_rate_limited_state_uses_fixed_layout(qtbot):
+    widget = _shown_widget(qtbot)
+    track_geometry = widget._track_label.geometry()
+    lyric_geometry = widget._lyric_label.geometry()
+
+    widget.show_rate_limited(30)
+
+    assert widget._track_label.geometry() == track_geometry
+    assert widget._lyric_label.geometry() == lyric_geometry
+    assert "rate limited" in widget._lyric_label.text()
