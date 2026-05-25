@@ -286,6 +286,19 @@ Add after V1 is stable:
 2. Add-to-playlist button with remembered default
 3. Playlist picker dropdown (owned playlists only)
 4. Additional OAuth scopes (`user-modify-playback-state`, playlist scopes)
+5. Title rendering rework (folds in a decided V1.x polish):
+   - **At rest: left-align the title.** It is currently set to `AlignCenter`, but the
+     V1.1/V1.2 layout reserves a right-side overlay gutter (`OVERLAY_GUTTER_WIDTH`, for the
+     ✕ close button + offline label) with no matching left gutter, so the centered title
+     sits ~half-a-gutter (~46px) left of the panel's true center and looks lopsided.
+     Left-aligning is cleaner and is the natural rest state for the marquee below.
+   - **On hover: marquee the full title** per the V1.2 plan's "V2 Future Notes" (dedicated
+     `MarqueeLabel`, fixed geometry, clipped painting, slow ping-pong, scroll the rendered
+     full string — never substring-slice, to stay CJK/Unicode-correct). Only animate when
+     the full title is wider than the available width.
+   - Decided 2026-05-25: do NOT ship this as a standalone V1.3. The alignment fix is folded
+     here because V2 reworks title rendering anyway. Until then, the lopsided-center title
+     is an accepted cosmetic limitation.
 
 ### V3 — Packaging
 
