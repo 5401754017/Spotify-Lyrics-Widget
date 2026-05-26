@@ -6,7 +6,9 @@ Date: 2026-05-22
 
 ## Overview
 
-A Windows desktop floating widget that displays real-time synced lyrics for the currently playing Spotify track. Single-line subtitle mode, always-on-top, with hover-to-reveal playback controls.
+A Windows desktop floating widget that displays real-time synced lyrics for the currently
+playing Spotify track. Compact subtitle-style display with a fixed lyric lane that can show
+up to two lines, always-on-top, with hover-to-reveal playback controls.
 
 **Target user:** Personal use only (developer themselves). Requires Spotify Premium.
 
@@ -22,7 +24,11 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
   3. Prefer closest normalized track name / artist name match
 - **Session cache:** Cache successful lookups and confirmed "no lyrics" misses by Spotify track ID. Avoid redundant API calls when the user loops a song or goes back to a previous track. Do not cache temporary API/network/rate-limit failures as "no lyrics".
 - **Only use `syncedLyrics`** (LRC format with timestamps). If `syncedLyrics` is null, display "no synced lyrics available" regardless of whether `plainLyrics` exists
-- **V1.4 fallback:** Optional NetEase fallback may run only after LRCLIB returns a confirmed miss. NetEase timeout / non-200 / malformed response / 429 is temporary unavailable, must be logged with the real reason, must respect `Retry-After`, and must not be cached as a miss.
+- **V1.4 fallback (NetEase):** Optional NetEase fallback may run only after LRCLIB returns a confirmed miss. Validated by a real-endpoint spike (2026-05-26): `music.163.com/api` search + song-lyric work with no cookie/auth. NetEase specifics learned from the spike and now part of the design:
+  - **Rank multiple candidates, never `search[0]`** — the top search hit can be a cover with no timestamps. Rank by normalized title/artist + duration, then fetch the lyric of the best candidate and require it to parse into timed lines; fall through up to 3 candidates before returning a confirmed miss.
+  - **Traditional/Simplified unification (`zhconv`)** — Spotify metadata is Traditional, NetEase is Simplified. Normalize both sides to one script before matching, and convert the accepted NetEase lyric to `zh-tw` for display.
+  - **Credit-line filter (NetEase-only)** — NetEase prepends `[00:00.xx] 作词 : …` / `编曲 : …` production credits; drop them in the NetEase path so they do not show as the first lyric lines. LRCLIB's primary path is unchanged.
+  - NetEase timeout / non-200 / malformed response / 429 is temporary unavailable, must be logged with the real reason, must respect `Retry-After`, and must not be cached as a miss.
 - **No private Spotify-cookie fallback in V1.4.** Do not use `sp_dc` / unofficial Spotify lyrics cookie flows for V1.4. No Genius, no Musixmatch, no scraping.
 
 ---
@@ -71,16 +77,25 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
 | Module | Phase | Responsibility |
 |---|---|---|
 | `auth` | V1 | Spotify PKCE OAuth flow, token storage, auto-refresh |
-| `spotify_player` | V1 | Poll currently playing track every 1s in a worker thread. Emit state-change signals. V2: expose playback control methods (play, pause, next, prev) |
-| `lyrics` | V1 | Query lrclib.net in a worker thread, parse LRC timestamps into sorted list of `(timestamp_ms, line_text)`. Cache results by Spotify track ID for the session. |
-| `playlist` | Deferred (post-V2) | Fetch user's playlists, add track to playlist, manage default playlist memory |
 | `config` | V1 | Read/write JSON config file: client_id, tokens, window position (x, y). Deferred phase: default playlist ID |
-| `ui` | V1 | PyQt6 frameless always-on-top draggable window, lyric display, progress bar. V2: hover playback controls + title marquee. Deferred phase: playlist picker |
+| `spotify_worker` | V1 | Poll currently playing track every 1s in a worker thread. Emit state-change, playback, network, and rate-limit signals. |
+| `lyrics_worker` | V1 | Query lrclib.net in a worker thread, cache results by Spotify track ID for the session, and emit lyrics/no-lyrics/unavailable signals. |
+| `lrc_parser` | V1 | Parse LRC timestamps into sorted `(timestamp_ms, line_text)` tuples and find the current line. |
+| `widget` | V1-V1.3 | PyQt6 frameless always-on-top draggable window, rounded mask, rounded panel, lyric display, progress bar, offline status in lyric lane. V2: hover playback controls + title marquee. |
+| `logging_setup` | V1.2-V1.3 | Configure `%APPDATA%/spotify-lyrics-widget/widget.log`, rotating file handler, and uncaught-exception logging for `pythonw`. |
+| `fonts` | V1.3 | Detect system CJK font (`Microsoft JhengHei UI` → `Microsoft JhengHei` → `Segoe UI`) and expose `app_font_family()`. |
+| `tray` | V1.3 | System tray icon, raise/show-hide/open-log/quit menu actions. |
+| `shortcuts` | V1.3 | One-shot Start-menu and desktop `.lnk` installer using Windows `WScript.Shell`. |
+| `netease` | V1.4 planned | Optional NetEase fallback source after LRCLIB confirmed miss. |
+| `playback` | V2 planned | Fire-and-forget Spotify playback control calls with duplicate-click and 429 brakes. |
+| `marquee` | V2 planned | Dedicated title renderer: left-aligned/elided at rest, hover ping-pong marquee when overflowing. |
+| `playlist` | Deferred (post-V2) | Fetch user's playlists, add track to playlist, manage default playlist memory |
 
 ### Dependency Direction
 
 ```
-ui → spotify_player, lyrics, playlist → auth, config
+main/widget → spotify_worker, lyrics_worker, tray → auth, config, lrc_parser
+future: lyrics_worker → netease; widget/main → playback + marquee; playlist phase adds playlist module
 ```
 
 ### Threading Model
@@ -96,10 +111,17 @@ All HTTP calls run off the GUI thread to prevent UI freezes:
 
 PyQt6 Signals/Slots:
 
-- `spotify_player.track_changed(track_info)` → `lyrics.fetch()`, `ui.update_track_info()`
-- `spotify_player.state_synced(progress_ms, is_playing, timestamp)` → `ui.resync_local_timer()`
-- `spotify_player.playback_toggled(is_playing)` → `ui.freeze_or_resume()`
-- `lyrics.lyrics_ready(track_id, lyric_lines)` → `ui.set_lyrics()` (ignored if track_id is stale)
+- `spotify_worker.track_changed(PlayerState)` → `App._on_track_changed()` updates
+  `LyricsWidget`, clears the lyric lane, and calls `LyricsWorker.request_lyrics(TrackInfo)`.
+  (The old forced `repaint()`/`force_visual_refresh()` workaround was removed in `4589a84`;
+  the opaque masked window repaints correctly through normal Qt paths.)
+- `spotify_worker.state_synced(progress_ms, is_playing, timestamp)` →
+  `LyricsWidget.resync_local_timer()`.
+- `spotify_worker.playback_toggled(is_playing)` → stop/resume local UI timer handling.
+- `spotify_worker.not_playing` / `not_a_track` / `network_error` / `rate_limited` →
+  corresponding status text in the lyric lane.
+- `lyrics_worker.lyrics_ready(track_id, lyric_lines)` → `LyricsWidget.set_lyrics()`
+  when `track_id` still matches the current track; stale results are ignored.
 
 ---
 
@@ -134,19 +156,26 @@ V1/V1.2: hover shows the close button only. V1.3 moves network offline status in
 
 ### Visual Style
 
-- **Background:** Pure black `#000000`, fully opaque
+- **Window surface:** Frameless opaque top-level window clipped by a rounded `QRegion` mask.
+  The inner `#121212` panel keeps the same rounded Spotify-green border. V1.3 no longer uses
+  `WA_TranslucentBackground` because that Windows layered-window path caused stale visual
+  buffers during live track changes.
 - **Song name / artist:** White `#FFFFFF`
 - **Lyrics text:** Spotify green `#1DB954`
 - **Control icons:** White `#FFFFFF`
 - **Progress bar:** Spotify green `#1DB954` on dark gray track
 - **Close button:** White
-- **Design:** Completely flat. No transparency, no reflections, no highlights, no gradients
-- **Font:** V1.3 loads bundled Noto Sans TC for title + lyric; fallback is `Segoe UI` if the bundled font is unavailable.
+- **Design:** Flat panel, no reflections, highlights, gradients, or glass effects.
+- **Font:** V1.3 uses system font detection: `Microsoft JhengHei UI` → `Microsoft JhengHei`
+  → `Segoe UI`. The original bundled `NotoSansTC-VF.ttf` asset is retained in `assets/fonts/`
+  but is not loaded because `QFontDatabase.addApplicationFont()` caused a Qt 6.11.0 access
+  violation during live testing.
 
 ### Window Behavior
 
 - Frameless (`Qt.FramelessWindowHint`)
 - Always on top (`Qt.WindowStaysOnTopHint`)
+- Rounded top-level mask (`QPainterPath` → `QRegion`) instead of transparent layered corners
 - Draggable by clicking and holding anywhere on the window
 - Position saved to config on close, restored on launch
 - System tray icon (added V1.3): running-status indicator, left-click raises the widget to
@@ -246,15 +275,17 @@ Location: `%APPDATA%/spotify-lyrics-widget/config.json` (per-user, standard Wind
   "refresh_token": "...",
   "token_expires_at": 1716400000,
   "window_x": 100,
-  "window_y": 100,
-  "default_playlist_id": "4abc123def456"
+  "window_y": 100
 }
 ```
 
 Notes:
 - No `client_secret` (PKCE flow does not use one)
-- `default_playlist_id` stores a bare Spotify playlist ID, not a URI (deferred playlist phase, not V2)
 - `token_expires_at` is a Unix timestamp in seconds
+- Planned future config additions:
+  - V1.4: `netease_fallback` boolean, default `true`
+  - V2: `granted_scope` string for one-time re-auth when scopes change
+  - Deferred playlist phase: `default_playlist_id` as a bare Spotify playlist ID, not a URI
 
 ---
 
@@ -262,7 +293,8 @@ Notes:
 
 - **Language:** Python 3.11+
 - **GUI:** PyQt6
-- **HTTP:** requests (or httpx)
+- **HTTP:** httpx
+- **Chinese script conversion (V1.4):** `zhconv` (pure-Python Traditional/Simplified, MediaWiki tables) — used to match Traditional Spotify metadata against Simplified NetEase results and to render NetEase lyrics as `zh-tw`.
 - **Packaging:** PyInstaller → single .exe
 - **Platform:** Windows only
 
@@ -278,7 +310,7 @@ Prove the main idea works end-to-end:
 2. Current track polling (worker thread)
 3. lrclib lookup with session cache (worker thread)
 4. LRC parsing + binary search line matching
-5. Single-line lyric display with local timer interpolation
+5. Fixed-height lyric display with local timer interpolation, capped to two lines
 6. Frameless always-on-top draggable widget
 7. Read-only progress bar (2px)
 8. Config persistence (client_id, tokens, window position) in AppData
