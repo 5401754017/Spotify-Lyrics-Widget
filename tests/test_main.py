@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import src.main as main_module
 from src.main import App
+from src.spotify_worker import PlayerState
 
 
 def _make_app():
@@ -120,6 +121,27 @@ def test_connect_signals_wires_rate_limit_state():
     app._spotify_worker.rate_limited.connect.assert_called_once_with(
         widget.show_rate_limited
     )
+
+
+def test_track_change_forces_visual_refresh():
+    app, _, widget = _make_app()
+    state = PlayerState(
+        track_id="new",
+        track_name="New Song",
+        track_uri="spotify:track:new",
+        artist_name="Artist",
+        album_name="Album",
+        duration_ms=180000,
+        progress_ms=0,
+        is_playing=True,
+        is_track=True,
+    )
+
+    app._on_track_changed(state)
+
+    widget.update_track_info.assert_called_once_with("New Song", "Artist")
+    widget.set_lyric_text.assert_called_once_with("")
+    widget.force_visual_refresh.assert_called_once()
 
 
 def test_start_creates_and_shows_tray():

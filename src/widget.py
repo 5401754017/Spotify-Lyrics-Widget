@@ -1,7 +1,14 @@
 import time
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
-from PyQt6.QtGui import QCloseEvent, QEnterEvent, QFont, QMouseEvent
+from PyQt6.QtCore import QPoint, QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtGui import (
+    QCloseEvent,
+    QEnterEvent,
+    QFont,
+    QMouseEvent,
+    QPainterPath,
+    QRegion,
+)
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
@@ -27,6 +34,7 @@ WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 20
 LYRIC_LANE_HEIGHT = 60
 OVERLAY_GUTTER_WIDTH = 92
+CORNER_RADIUS = 12
 
 
 class LyricsWidget(QWidget):
@@ -55,10 +63,18 @@ class LyricsWidget(QWidget):
             | Qt.WindowType.WindowStaysOnTopHint
             | Qt.WindowType.Tool
         )
-        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
-        self.setStyleSheet("background-color: transparent;")
+        self._apply_window_mask()
         self.setMouseTracking(True)
+
+    def _apply_window_mask(self):
+        path = QPainterPath()
+        path.addRoundedRect(
+            QRectF(0, 0, self.width(), self.height()),
+            CORNER_RADIUS,
+            CORNER_RADIUS,
+        )
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
     def _setup_ui(self):
         outer_layout = QVBoxLayout()
@@ -151,6 +167,24 @@ class LyricsWidget(QWidget):
 
     def update_progress(self, ratio: float):
         self._progress_bar.setValue(int(ratio * 100))
+
+    def force_visual_refresh(self):
+        self._repaint_visual_tree()
+        QTimer.singleShot(0, self._repaint_visual_tree)
+
+    def _visual_refresh_widgets(self):
+        return (
+            self._track_label,
+            self._lyric_label,
+            self._progress_bar,
+            self._panel,
+            self,
+        )
+
+    def _repaint_visual_tree(self):
+        for widget in self._visual_refresh_widgets():
+            widget.update()
+            widget.repaint()
 
     def resync_local_timer(
         self, progress_ms: int, is_playing: bool, local_timestamp: float
@@ -260,6 +294,7 @@ class LyricsWidget(QWidget):
         super().showEvent(event)
 
     def resizeEvent(self, event):
+        self._apply_window_mask()
         self._position_overlay_controls()
         self._refresh_track_label_text()
         super().resizeEvent(event)
