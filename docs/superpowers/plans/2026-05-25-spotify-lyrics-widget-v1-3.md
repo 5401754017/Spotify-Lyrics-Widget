@@ -2,9 +2,20 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the widget easy to find and reach — bundle a CJK font so Chinese renders correctly, add a system tray icon that confirms the app is running and raises the widget when covered, install Start-menu / desktop shortcuts (no startup-on-boot), and move the offline status into the lyric lane so V2 has a clean fixed top row.
+**Goal:** Make the widget easy to find and reach — use a stable CJK-capable system font so
+Chinese renders correctly, add a system tray icon that confirms the app is running and raises
+the widget when covered, install Start-menu / desktop shortcuts (no startup-on-boot), and move
+the offline status into the lyric lane so V2 has a clean fixed top row.
 
-**Architecture:** Three independent reachability features plus one small UI correction. `widget.py` removes the right-top offline overlay and renders offline as central status text in the existing lyric lane. `src/fonts.py` loads a bundled Noto Sans TC at startup and exposes the family name; `widget.py` reads it (falling back to Segoe UI when not loaded, so tests are unaffected). `src/tray.py` wraps `QSystemTrayIcon` and takes plain callbacks; `App` (in `main.py`) wires those callbacks to its existing `raise_window`, a new visibility toggle, an open-log action, and quit. `src/shortcuts.py` builds `.lnk` files via the Windows-built-in `WScript.Shell` COM object driven through PowerShell, with a one-shot `scripts/install_shortcuts.py` entry point.
+**Architecture:** Three independent reachability features plus one small UI correction.
+`widget.py` removes the right-top offline overlay and renders offline as central status text
+in the existing lyric lane. `src/fonts.py` detects a CJK-capable system font at startup
+(`Microsoft JhengHei UI` → `Microsoft JhengHei` → `Segoe UI`) and exposes the family name;
+`widget.py` reads it through `app_font_family()`. `src/tray.py` wraps `QSystemTrayIcon` and
+takes plain callbacks; `App` (in `main.py`) wires those callbacks to its existing
+`raise_window`, a new visibility toggle, an open-log action, and quit. `src/shortcuts.py`
+builds `.lnk` files via the Windows-built-in `WScript.Shell` COM object driven through
+PowerShell, with a one-shot `scripts/install_shortcuts.py` entry point.
 
 **Tech Stack:** Python 3, PyQt6 (`QtGui`, `QtWidgets`), pytest + pytest-qt. No new third-party dependencies (PowerShell `WScript.Shell` is built into Windows; the tray icon is drawn at runtime with `QPainter`).
 
@@ -14,16 +25,16 @@
 
 | File | Status | Responsibility |
 |------|--------|----------------|
-| `assets/fonts/NotoSansTC-VF.ttf` | Create (download) | Bundled CJK variable font covering Regular/Bold weights |
-| `assets/fonts/OFL.txt` | Create (download) | SIL Open Font License for the bundled font |
-| `src/fonts.py` | Create | Load bundled font into `QFontDatabase`, expose `app_font_family()` |
-| `src/widget.py` | Modify | Remove right-top offline overlay; show `offline` in the lyric lane; use `app_font_family()` instead of hardcoded `"Segoe UI"`; re-tune `LYRIC_LANE_HEIGHT` |
+| `assets/fonts/NotoSansTC-VF.ttf` | Retained, not loaded | Original bundled CJK variable font; kept for reference/license history after hotfix |
+| `assets/fonts/OFL.txt` | Retained | SIL Open Font License for the retained Noto asset |
+| `src/fonts.py` | Create/modify | Detect system CJK font via `QFontDatabase.families()`, expose `app_font_family()` |
+| `src/widget.py` | Modify | Remove right-top offline overlay; show `offline` in the lyric lane; use `app_font_family()` instead of hardcoded `"Segoe UI"`; final `LYRIC_LANE_HEIGHT = 60` |
 | `src/tray.py` | Create | `QSystemTrayIcon` wrapper: runtime-drawn icon + context menu, callback-driven |
 | `src/logging_setup.py` | Modify | Extract `log_file_path()` so the tray can locate `widget.log` |
 | `src/main.py` | Modify | Load font before building UI; create/wire/hide the tray icon; add `_toggle_widget` / `_open_log` |
 | `src/shortcuts.py` | Create | Pure path/script builders + `create_shortcuts()` side-effecting installer |
 | `scripts/install_shortcuts.py` | Create | One-shot entry point the user runs to install shortcuts |
-| `tests/test_fonts.py` | Create | Font loader fallback + bundled-font smoke test |
+| `tests/test_fonts.py` | Create/modify | Font fallback + system-font detection tests |
 | `tests/test_tray.py` | Create | Tray icon non-null, activation reason routing, menu actions, toggle label |
 | `tests/test_shortcuts.py` | Create | Script builder, `pythonw` path derivation, shortcut locations |
 | `tests/test_logging_setup.py` | Modify | Add `log_file_path()` test |
@@ -85,161 +96,59 @@ Expected: all widget tests pass, and there is no top-row offline overlay left.
 
 ---
 
-## Task 1: Bundle and load Noto Sans TC
+## Task 1: Use stable system CJK font (final V1.3)
 
-**Why:** `Segoe UI` has no CJK glyphs, so Windows substitutes an ugly fallback for Chinese titles/lyrics. Noto Sans TC (= 思源黑體, SIL OFL — free to bundle) fixes this. Loading at startup and reading the family name keeps the change in one place. Tests construct the widget without loading the font, so the family falls back to `Segoe UI` and existing font tests stay green.
+**Why:** The original plan bundled `NotoSansTC-VF.ttf` and loaded it with
+`QFontDatabase.addApplicationFont()`, but live V1.3 testing on Windows + Qt 6.11.0 showed
+that the 36 MB variable font can trigger a fatal access violation inside Qt's font path.
+The final V1.3 implementation therefore uses Windows system fonts instead of loading the
+bundled font file.
 
 **Files:**
-- Create: `assets/fonts/NotoSansTC-VF.ttf`, `assets/fonts/OFL.txt`
-- Create: `src/fonts.py`
+- Retain: `assets/fonts/NotoSansTC-VF.ttf`, `assets/fonts/OFL.txt` (reference/license only;
+  do not load in V1.3)
+- Create/modify: `src/fonts.py`
 - Test: `tests/test_fonts.py`
-- Modify: `src/widget.py:87`, `src/widget.py:111`, `src/widget.py:27`
+- Modify: `src/widget.py` (use `app_font_family()`, final `LYRIC_LANE_HEIGHT = 60`)
 - Modify: `src/main.py` (call `load_app_font()` in `main()`)
 
-- [ ] **Step 1: Download the font files**
-
-Download the Traditional Chinese variable TTF and the license from the official Noto CJK repo:
-- https://github.com/googlefonts/noto-cjk/tree/main/Sans/Variable/TTF
-
-Use exactly these asset names in the repo: `NotoSansTC-VF.ttf`, `OFL.txt`. The single variable font covers the weight range used by the title and lyric labels.
-
-Place them at `assets/fonts/NotoSansTC-VF.ttf`. Save the `OFL.txt` license alongside it. Confirm the files exist and are non-trivial in size:
-
-Run: `Get-ChildItem assets\fonts\`
-Expected: two files listed; the `.ttf` file is several MB.
-
-- [ ] **Step 2: Write the failing test for the font loader**
-
-Create `tests/test_fonts.py`:
+Final `src/fonts.py` behavior:
 
 ```python
-from pathlib import Path
-
-from src import fonts
-
-
-def test_app_font_family_defaults_to_fallback():
-    fonts._loaded_family = None
-    assert fonts.app_font_family() == "Segoe UI"
-
-
-def test_load_app_font_falls_back_when_files_missing(qtbot, monkeypatch, tmp_path):
-    fonts._loaded_family = None
-    monkeypatch.setattr(fonts, "_FONT_DIR", tmp_path)  # empty dir, no font files
-    assert fonts.load_app_font() == "Segoe UI"
-
-
-def test_load_app_font_loads_bundled_noto(qtbot):
-    fonts._loaded_family = None
-    family = fonts.load_app_font()
-    assert "Noto" in family
-    assert fonts.app_font_family() == family
-```
-
-- [ ] **Step 3: Run the test to verify it fails**
-
-Run: `pytest tests/test_fonts.py -v`
-Expected: FAIL with `ModuleNotFoundError: No module named 'src.fonts'`.
-
-- [ ] **Step 4: Implement `src/fonts.py`**
-
-```python
-from pathlib import Path
-
-from PyQt6.QtGui import QFontDatabase
-
-_FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-_FONT_FILES = ("NotoSansTC-VF.ttf",)
-FALLBACK_FAMILY = "Segoe UI"
-
-_loaded_family: str | None = None
+FALLBACK_FAMILY = "Microsoft JhengHei UI"
 
 
 def load_app_font() -> str:
-    """Register the bundled font with Qt and remember its family name.
-
-    Must be called after QApplication is created. Returns FALLBACK_FAMILY if
-    no font file could be loaded.
-    """
     global _loaded_family
-    family = FALLBACK_FAMILY
-    for file_name in _FONT_FILES:
-        font_id = QFontDatabase.addApplicationFont(str(_FONT_DIR / file_name))
-        if font_id < 0:
-            continue
-        families = QFontDatabase.applicationFontFamilies(font_id)
-        if families:
-            family = families[0]
-    _loaded_family = family
-    return family
-
-
-def app_font_family() -> str:
-    """Family name to use for widget fonts; FALLBACK_FAMILY until loaded."""
-    return _loaded_family or FALLBACK_FAMILY
+    families = QFontDatabase.families()
+    for preferred in ("Microsoft JhengHei UI", "Microsoft JhengHei", "Segoe UI"):
+        if preferred in families:
+            _loaded_family = preferred
+            return preferred
+    _loaded_family = FALLBACK_FAMILY
+    return FALLBACK_FAMILY
 ```
 
-- [ ] **Step 5: Run the test to verify it passes**
-
-Run: `pytest tests/test_fonts.py -v`
-Expected: PASS (3 passed). If `test_load_app_font_loads_bundled_noto` fails, the font files in Step 1 are missing or named wrong — fix the filenames.
-
-- [ ] **Step 6: Apply the loaded family in `src/widget.py`**
-
-Add the import near the top of `src/widget.py` (after the existing `from src.lrc_parser import find_current_line`):
+`widget.py` uses the selected family for both title and lyric labels:
 
 ```python
-from src.fonts import app_font_family
+self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
+self._lyric_label.setFont(QFont(app_font_family(), 16, QFont.Weight.Bold))
 ```
 
-After Task 0 removes `_offline_label`, replace the two remaining hardcoded `"Segoe UI"` font constructions:
+**Important:** Do not reintroduce `QFontDatabase.addApplicationFont()` for
+`NotoSansTC-VF.ttf` in V1.3. The file remains in `assets/fonts/` only because it was part of
+the original implementation and keeps the license/history intact.
 
-- `src/widget.py:87` — `self._track_label.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))`
-  →
-```python
-        self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
-```
-
-- `src/widget.py:111` — `self._lyric_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))`
-  →
-```python
-        self._lyric_label.setFont(QFont(app_font_family(), 16, QFont.Weight.Bold))
-```
-
-- [ ] **Step 7: Load the font in `main()` before any widget is built**
-
-In `src/main.py`, add the import alongside the other `src` imports:
-
-```python
-from src.fonts import load_app_font
-```
-
-In `main()`, immediately after `app.setApplicationName("Spotify Lyrics Widget")` (line 250), add:
-
-```python
-    load_app_font()
-```
-
-This runs before `App()` constructs `LyricsWidget`, so `app_font_family()` returns the Noto family in the real app.
-
-- [ ] **Step 8: Run the full widget + main test suites to confirm nothing broke**
-
-Run: `pytest tests/test_widget.py tests/test_main.py tests/test_fonts.py -v`
-Expected: all PASS. (`test_track_label_font_is_larger_and_demibold` only checks point size ≥ 10 and weight ≥ DemiBold, so the family swap does not affect it.)
-
-- [ ] **Step 9: Visually verify CJK rendering and re-tune the lyric lane height**
-
-Run the app: `python run.pyw` (or `pythonw run.pyw`) and play a track with a Chinese title and Chinese lyrics.
-Verify: Chinese glyphs render with Noto Sans TC (clean, not a blocky fallback). Confirm the 2-line lyric lane does NOT clip the second line — Noto's metrics differ from Segoe UI.
-
-If the second line is clipped, increase `LYRIC_LANE_HEIGHT` in `src/widget.py:27` (start at `56`, try `60`, then `64`) until two full lines fit without growing the panel awkwardly. Re-run and re-check. Record the final value.
-
-- [ ] **Step 10: Commit**
+Final verification:
 
 ```bash
-git add assets/fonts/ src/fonts.py src/widget.py src/main.py tests/test_fonts.py
-git commit -m "feat: bundle Noto Sans TC and apply to widget fonts (V1.3)"
+pytest tests/test_fonts.py tests/test_widget.py tests/test_main.py -v
 ```
+
+Manual verification: run the app with Chinese title/lyrics and confirm the glyphs render
+cleanly with `Microsoft JhengHei UI` or `Microsoft JhengHei`, and that two lyric lines fit
+inside the fixed lane.
 
 ---
 
@@ -739,13 +648,13 @@ git commit -m "feat: add Start-menu/desktop shortcut installer (V1.3)"
 
 ## Self-Review
 
-**Spec coverage** (against the roadmap V1.3 line: ① shortcut no-autostart, ② Noto Sans TC font, ③ tray icon with status / raise / right-click menu incl. open-log, ④ offline status in lyric lane):
+**Spec coverage** (against the final roadmap V1.3 line: ① shortcut no-autostart, ② stable CJK system font, ③ tray icon with status / raise / right-click menu incl. open-log, ④ offline status in lyric lane):
 - ① shortcut, no startup-on-boot → Task 3 (verified in Step 6 that `shell:startup` stays empty).
-- ② Noto Sans TC for title + lyric, re-tune lane height → Task 1 (Steps 6, 9).
+- ② Microsoft JhengHei UI / Microsoft JhengHei system font for title + lyric, final lane height 60 → Task 1 + Hotfix A.
 - ③ tray icon: status indicator → Task 2 Step 14.1; left-click raise → Step 14.2 (+ documented Windows foreground fallback); right-click menu Show/Hide, Open log, Quit → Steps 3, 14.3; no orphan icon on quit → `shutdown` hide + Step 14.3; single-instance still one icon → Step 14.4.
 - ④ offline status in lyric lane, no right-top overlay → Task 0.
 
-**Placeholder scan:** No "TBD"/"add error handling"/"similar to" placeholders. The only deferred-to-runtime value is `LYRIC_LANE_HEIGHT` (Task 1 Step 9) — unavoidable visual tuning, given a concrete starting value (56) and try-sequence (60, 64).
+**Placeholder scan:** No "TBD"/"add error handling"/"similar to" placeholders. `LYRIC_LANE_HEIGHT` was visually tuned and finalized at `60`.
 
 **Type/name consistency:** `app_font_family()` defined in Task 1 and used in `widget.py` (Task 1) and `main.py` loads via `load_app_font()`. `TrayIcon(on_activate, on_toggle, on_open_log, on_quit)` signature in Task 2 Step 3 matches the call site in Step 11 and the test factory in Step 1. `log_file_path()` defined in Task 2 Step 7, used in `main.py` Step 11 and patched in the Step 9 test. `build_powershell_script`, `pythonw_path`, `shortcut_locations`, `create_shortcuts` names consistent across Task 3 module, tests, and entry point.
 
@@ -795,7 +704,7 @@ no longer loaded by `addApplicationFont`.
 `tests/test_fonts.py` updated: removed the monkeypatch `_FONT_DIR` test (no longer relevant),
 kept the fallback default test and the system-font load test.
 
-### Hotfix B: Widget not repainting after track change
+### Hotfix B: Widget not visually refreshing after track change
 
 **Symptom:** After fixing the font crash, the UI main thread is alive (heartbeat log fires
 every 30 s), `_on_track_changed` slot fires (log shows correct new track name), `QLabel.text()`
@@ -807,7 +716,7 @@ and back, or minimizing/restoring, forces the repaint and the correct text appea
 not always mark the layered surface as dirty, so Windows never repaints the pixel buffer. This
 is a known Qt rendering edge case on Windows with translucent frameless windows.
 
-**Fix (`src/main.py`):**
+**Initial fix (`src/main.py`):**
 
 Added `self._widget.repaint()` after updating labels in `_on_track_changed`:
 
@@ -817,6 +726,42 @@ self._widget.set_duration(state.duration_ms)
 self._widget.set_lyric_text("")
 self._widget.repaint()  # force DWM to redraw the layered surface
 ```
+
+**Second fix attempt after recurrence (`src/widget.py` + `src/main.py`):**
+
+Live logs later showed the same symptom with stronger evidence: Spotify polling had the new
+track, `_on_track_changed` fired, and `QLabel.text()` already contained the new title, but
+the screen still showed the previous song. That proves a top-level `repaint()` alone is not
+enough for this transparent layered window.
+
+The code now calls `self._widget.force_visual_refresh()` from `_on_track_changed`. That
+method repaints the child labels, progress bar, panel, and outer window immediately, then
+queues the same repaint tree on the next Qt event-loop tick:
+
+```python
+def force_visual_refresh(self):
+    self._repaint_visual_tree()
+    QTimer.singleShot(0, self._repaint_visual_tree)
+```
+
+This helped make the UI update path explicit, but a later live retest still reproduced the
+stale visual surface immediately after restart.
+
+**Final render-path fix (`src/widget.py`):**
+
+The widget no longer uses `WA_TranslucentBackground`. It keeps the same frameless always-on-top
+shape, but the top-level window is now a normal opaque Qt window clipped with a rounded
+`QRegion` mask:
+
+```python
+path = QPainterPath()
+path.addRoundedRect(QRectF(0, 0, self.width(), self.height()), 12, 12)
+self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+```
+
+This preserves rounded corners without using Windows layered alpha compositing, which is the
+unstable render path seen in the live logs. `force_visual_refresh()` remains in place as a
+cheap explicit repaint after track changes, but it is no longer the primary fix.
 
 ### Additional diagnostics added alongside hotfixes
 
@@ -833,16 +778,12 @@ These logging improvements were added to diagnose the freeze and kept for future
 ### Commits
 
 - `8fe86f9` — font crash fix + crash logging + playback diagnostics (merged to master as `d5ca276`)
-- Second commit (this addendum) — repaint fix + label diagnostics + heartbeat + doc updates
+- `a587e6b` — initial repaint fix + label diagnostics + heartbeat + doc updates (merged to master as `c164cb0`)
 
 ---
 
-## Execution Handoff
+## Execution Status
 
-**Plan complete and saved to `docs/superpowers/plans/2026-05-25-spotify-lyrics-widget-v1-3.md`. Two execution options:**
-
-**1. Subagent-Driven (recommended)** — I dispatch a fresh subagent per task, review between tasks, fast iteration.
-
-**2. Inline Execution** — Execute tasks in this session using executing-plans, batch execution with checkpoints.
-
-**Which approach?**
+V1.3 is complete and merged to `master` through `c164cb0`. Future agents should treat this
+file as the historical implementation record plus final hotfix notes, not as an open handoff
+asking which execution approach to choose.
