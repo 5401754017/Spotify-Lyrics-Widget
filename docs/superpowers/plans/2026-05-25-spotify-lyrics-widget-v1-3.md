@@ -2,9 +2,9 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make the widget easy to find and reach — bundle a CJK font so Chinese renders correctly, add a system tray icon that confirms the app is running and raises the widget when covered, and install Start-menu / desktop shortcuts (no startup-on-boot).
+**Goal:** Make the widget easy to find and reach — bundle a CJK font so Chinese renders correctly, add a system tray icon that confirms the app is running and raises the widget when covered, install Start-menu / desktop shortcuts (no startup-on-boot), and move the offline status into the lyric lane so V2 has a clean fixed top row.
 
-**Architecture:** Three independent features, each in its own focused module. `src/fonts.py` loads a bundled Noto Sans TC at startup and exposes the family name; `widget.py` reads it (falling back to Segoe UI when not loaded, so tests are unaffected). `src/tray.py` wraps `QSystemTrayIcon` and takes plain callbacks; `App` (in `main.py`) wires those callbacks to its existing `raise_window`, a new visibility toggle, an open-log action, and quit. `src/shortcuts.py` builds `.lnk` files via the Windows-built-in `WScript.Shell` COM object driven through PowerShell, with a one-shot `scripts/install_shortcuts.py` entry point.
+**Architecture:** Three independent reachability features plus one small UI correction. `widget.py` removes the right-top offline overlay and renders offline as central status text in the existing lyric lane. `src/fonts.py` loads a bundled Noto Sans TC at startup and exposes the family name; `widget.py` reads it (falling back to Segoe UI when not loaded, so tests are unaffected). `src/tray.py` wraps `QSystemTrayIcon` and takes plain callbacks; `App` (in `main.py`) wires those callbacks to its existing `raise_window`, a new visibility toggle, an open-log action, and quit. `src/shortcuts.py` builds `.lnk` files via the Windows-built-in `WScript.Shell` COM object driven through PowerShell, with a one-shot `scripts/install_shortcuts.py` entry point.
 
 **Tech Stack:** Python 3, PyQt6 (`QtGui`, `QtWidgets`), pytest + pytest-qt. No new third-party dependencies (PowerShell `WScript.Shell` is built into Windows; the tray icon is drawn at runtime with `QPainter`).
 
@@ -14,11 +14,10 @@
 
 | File | Status | Responsibility |
 |------|--------|----------------|
-| `assets/fonts/NotoSansTC-Regular.ttf` | Create (download) | Bundled CJK font, Regular weight |
-| `assets/fonts/NotoSansTC-Bold.ttf` | Create (download) | Bundled CJK font, Bold weight |
+| `assets/fonts/NotoSansTC-VF.ttf` | Create (download) | Bundled CJK variable font covering Regular/Bold weights |
 | `assets/fonts/OFL.txt` | Create (download) | SIL Open Font License for the bundled font |
 | `src/fonts.py` | Create | Load bundled font into `QFontDatabase`, expose `app_font_family()` |
-| `src/widget.py` | Modify | Use `app_font_family()` instead of hardcoded `"Segoe UI"`; re-tune `LYRIC_LANE_HEIGHT` |
+| `src/widget.py` | Modify | Remove right-top offline overlay; show `offline` in the lyric lane; use `app_font_family()` instead of hardcoded `"Segoe UI"`; re-tune `LYRIC_LANE_HEIGHT` |
 | `src/tray.py` | Create | `QSystemTrayIcon` wrapper: runtime-drawn icon + context menu, callback-driven |
 | `src/logging_setup.py` | Modify | Extract `log_file_path()` so the tray can locate `widget.log` |
 | `src/main.py` | Modify | Load font before building UI; create/wire/hide the tray icon; add `_toggle_widget` / `_open_log` |
@@ -29,8 +28,60 @@
 | `tests/test_shortcuts.py` | Create | Script builder, `pythonw` path derivation, shortcut locations |
 | `tests/test_logging_setup.py` | Modify | Add `log_file_path()` test |
 | `tests/test_main.py` | Modify | Add `_toggle_widget` / `_open_log` tests |
+| `tests/test_widget.py` | Modify | Offline status uses lyric lane and does not create a top-row overlay |
 
 **All commands run from the project root** `C:\Users\crayo\personal-system\projects\spotify_widget`. `pytest.ini` sets `pythonpath = .` and `testpaths = tests`.
+
+---
+
+## Task 0: Move offline status into the lyric lane
+
+**Why:** V1.2 added a top-right `offline` overlay so the layout would not jump. V2 needs that same top-right area for fixed controls and close button. Offline is also a playback/status message, so it belongs in the same lane as `no synced lyrics`, not in the title/control row.
+
+Target layout:
+
+```text
+0     5                        50     60          80      90 95 100
++------------------------------------------------------------------+
+|     Song Name - Artist Name        [V2 controls later]      [X]   |
+|                                                                  |
+|                         offline                                  |
+|                                                                  |
++------------------------------------------------------------------+
+```
+
+**Files:**
+- Modify: `src/widget.py`
+- Test: `tests/test_widget.py`
+
+- [ ] **Step 1: Write failing tests**
+
+Add tests covering:
+- `show_offline()` sets the lyric label text to `offline`.
+- No `_offline_label` overlay child exists after widget construction.
+- Showing offline does not change title geometry, lyric geometry, or widget size.
+- `hide_offline()` clears the offline status only when the current lyric-lane state is offline; it must not accidentally erase a real lyric that arrived after recovery.
+
+- [ ] **Step 2: Remove the overlay child**
+
+In `src/widget.py`, delete the `_offline_label` creation and any geometry update code for that label. Do not leave a hidden overlay around "just in case"; V2 must inherit a clean top row.
+
+- [ ] **Step 3: Render offline through the lyric lane**
+
+Update the public widget methods so:
+- `show_offline()` stores a lightweight status flag and sets the lyric lane text to `offline`.
+- `hide_offline()` clears that flag and returns the lyric lane to the current lyric/no-lyrics/not-playing state.
+- The app wiring remains the same: Spotify worker network-error signal still calls `show_offline()`, recovery still calls `hide_offline()`.
+
+- [ ] **Step 4: Verify**
+
+Run:
+
+```bash
+pytest tests/test_widget.py -v
+```
+
+Expected: all widget tests pass, and there is no top-row offline overlay left.
 
 ---
 
@@ -39,22 +90,23 @@
 **Why:** `Segoe UI` has no CJK glyphs, so Windows substitutes an ugly fallback for Chinese titles/lyrics. Noto Sans TC (= 思源黑體, SIL OFL — free to bundle) fixes this. Loading at startup and reading the family name keeps the change in one place. Tests construct the widget without loading the font, so the family falls back to `Segoe UI` and existing font tests stay green.
 
 **Files:**
-- Create: `assets/fonts/NotoSansTC-Regular.ttf`, `assets/fonts/NotoSansTC-Bold.ttf`, `assets/fonts/OFL.txt`
+- Create: `assets/fonts/NotoSansTC-VF.ttf`, `assets/fonts/OFL.txt`
 - Create: `src/fonts.py`
 - Test: `tests/test_fonts.py`
-- Modify: `src/widget.py:87`, `src/widget.py:104`, `src/widget.py:111`, `src/widget.py:27`
+- Modify: `src/widget.py:87`, `src/widget.py:111`, `src/widget.py:27`
 - Modify: `src/main.py` (call `load_app_font()` in `main()`)
 
 - [ ] **Step 1: Download the font files**
 
-Download the static Regular and Bold TTFs and the license from Google Fonts' Noto Sans TC release:
-- https://github.com/notofonts/noto-cjk/releases (Sans → `NotoSansTC` OTFs), or
-- https://fonts.google.com/noto/specimen/Noto+Sans+TC (download family, use the static `NotoSansTC-Regular.ttf` and `NotoSansTC-Bold.ttf`)
+Download the Traditional Chinese variable TTF and the license from the official Noto CJK repo:
+- https://github.com/googlefonts/noto-cjk/tree/main/Sans/Variable/TTF
 
-Place them at `assets/fonts/NotoSansTC-Regular.ttf` and `assets/fonts/NotoSansTC-Bold.ttf`. Save the `OFL.txt` license alongside them. Confirm the files exist and are non-trivial in size:
+Use exactly these asset names in the repo: `NotoSansTC-VF.ttf`, `OFL.txt`. The single variable font covers the weight range used by the title and lyric labels.
+
+Place them at `assets/fonts/NotoSansTC-VF.ttf`. Save the `OFL.txt` license alongside it. Confirm the files exist and are non-trivial in size:
 
 Run: `Get-ChildItem assets\fonts\`
-Expected: three files listed; the two `.ttf` files are several MB each.
+Expected: two files listed; the `.ttf` file is several MB.
 
 - [ ] **Step 2: Write the failing test for the font loader**
 
@@ -97,7 +149,7 @@ from pathlib import Path
 from PyQt6.QtGui import QFontDatabase
 
 _FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-_FONT_FILES = ("NotoSansTC-Regular.ttf", "NotoSansTC-Bold.ttf")
+_FONT_FILES = ("NotoSansTC-VF.ttf",)
 FALLBACK_FAMILY = "Segoe UI"
 
 _loaded_family: str | None = None
@@ -140,18 +192,12 @@ Add the import near the top of `src/widget.py` (after the existing `from src.lrc
 from src.fonts import app_font_family
 ```
 
-Replace the three hardcoded `"Segoe UI"` font constructions:
+After Task 0 removes `_offline_label`, replace the two remaining hardcoded `"Segoe UI"` font constructions:
 
 - `src/widget.py:87` — `self._track_label.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))`
   →
 ```python
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
-```
-
-- `src/widget.py:104` — `self._offline_label.setFont(QFont("Segoe UI", 8))`
-  →
-```python
-        self._offline_label.setFont(QFont(app_font_family(), 8))
 ```
 
 - `src/widget.py:111` — `self._lyric_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))`
@@ -693,16 +739,17 @@ git commit -m "feat: add Start-menu/desktop shortcut installer (V1.3)"
 
 ## Self-Review
 
-**Spec coverage** (against the roadmap V1.3 line: ① shortcut no-autostart, ② Noto Sans TC font, ③ tray icon with status / raise / right-click menu incl. open-log):
+**Spec coverage** (against the roadmap V1.3 line: ① shortcut no-autostart, ② Noto Sans TC font, ③ tray icon with status / raise / right-click menu incl. open-log, ④ offline status in lyric lane):
 - ① shortcut, no startup-on-boot → Task 3 (verified in Step 6 that `shell:startup` stays empty).
 - ② Noto Sans TC for title + lyric, re-tune lane height → Task 1 (Steps 6, 9).
 - ③ tray icon: status indicator → Task 2 Step 14.1; left-click raise → Step 14.2 (+ documented Windows foreground fallback); right-click menu Show/Hide, Open log, Quit → Steps 3, 14.3; no orphan icon on quit → `shutdown` hide + Step 14.3; single-instance still one icon → Step 14.4.
+- ④ offline status in lyric lane, no right-top overlay → Task 0.
 
 **Placeholder scan:** No "TBD"/"add error handling"/"similar to" placeholders. The only deferred-to-runtime value is `LYRIC_LANE_HEIGHT` (Task 1 Step 9) — unavoidable visual tuning, given a concrete starting value (56) and try-sequence (60, 64).
 
 **Type/name consistency:** `app_font_family()` defined in Task 1 and used in `widget.py` (Task 1) and `main.py` loads via `load_app_font()`. `TrayIcon(on_activate, on_toggle, on_open_log, on_quit)` signature in Task 2 Step 3 matches the call site in Step 11 and the test factory in Step 1. `log_file_path()` defined in Task 2 Step 7, used in `main.py` Step 11 and patched in the Step 9 test. `build_powershell_script`, `pythonw_path`, `shortcut_locations`, `create_shortcuts` names consistent across Task 3 module, tests, and entry point.
 
-**Cross-feature note:** Tasks 1/2/3 are independent and can be implemented and committed in any order; the order above (font → tray → shortcuts) goes simplest-self-contained first.
+**Cross-feature note:** Task 0 should run before V2 so the top row is clean. Tasks 1/2/3 are otherwise independent and can be implemented and committed in any order; the order above (offline → font → tray → shortcuts) goes simplest-self-contained first.
 
 ---
 

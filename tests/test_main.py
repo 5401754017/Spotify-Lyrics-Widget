@@ -36,6 +36,25 @@ def test_main_configures_logging_before_starting_qapplication():
     assert events[:2] == ["log", "qt"]
 
 
+def test_main_loads_font_before_building_app():
+    events = []
+    qapp = MagicMock(exec=lambda: 0)
+    qapp.setApplicationName.side_effect = lambda name: events.append("name")
+
+    with (
+        patch("src.main.configure_logging"),
+        patch("src.main.QApplication", return_value=qapp),
+        patch("src.main.load_app_font", side_effect=lambda: events.append("font")),
+        patch("src.main.App", side_effect=lambda: events.append("app") or MagicMock()),
+        patch("src.main.SingleInstanceGuard") as guard_class,
+        patch("src.main.sys.exit", side_effect=lambda code=0: events.append(("exit", code))),
+    ):
+        guard_class.return_value.try_claim.return_value = False
+        main_module.main()
+
+    assert events[:3] == ["name", "font", "app"]
+
+
 def test_main_logs_and_shows_startup_failure():
     app_instance = MagicMock(exec=lambda: 0)
     controller = MagicMock()
@@ -103,6 +122,65 @@ def test_connect_signals_wires_rate_limit_state():
     )
 
 
+def test_start_creates_and_shows_tray():
+    app, config, _ = _make_app()
+    config.client_id = "client"
+    app._ensure_auth = MagicMock(return_value=True)
+    qapp = MagicMock()
+
+    with (
+        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.TrayIcon") as tray_class,
+    ):
+        tray = tray_class.return_value
+        app.start()
+
+    tray_class.assert_called_once_with(
+        on_activate=app.raise_window,
+        on_toggle=app._toggle_widget,
+        on_open_log=app._open_log,
+        on_quit=qapp.quit,
+    )
+    tray.set_widget_visible.assert_called_once_with(True)
+    tray.show.assert_called_once()
+
+
+def test_toggle_widget_hides_when_visible():
+    app, _, widget = _make_app()
+    app._tray = MagicMock()
+    widget.isVisible.return_value = True
+
+    app._toggle_widget()
+
+    widget.hide.assert_called_once()
+    app._tray.set_widget_visible.assert_called_once_with(False)
+
+
+def test_toggle_widget_raises_when_hidden():
+    app, _, widget = _make_app()
+    app._tray = MagicMock()
+    widget.isVisible.return_value = False
+
+    app._toggle_widget()
+
+    widget.showNormal.assert_called_once()
+    widget.raise_.assert_called_once()
+    widget.activateWindow.assert_called_once()
+    app._tray.set_widget_visible.assert_called_once_with(True)
+
+
+def test_open_log_starts_log_file():
+    app, _, _ = _make_app()
+
+    with (
+        patch("src.main.log_file_path", return_value="LOGPATH"),
+        patch("src.main.os.startfile", create=True) as startfile,
+    ):
+        app._open_log()
+
+    startfile.assert_called_once_with("LOGPATH")
+
+
 def test_widget_close_request_quits_qapplication():
     fake_qapp = MagicMock()
 
@@ -164,6 +242,26 @@ def test_shutdown_stops_workers_before_exit():
     spotify_worker.stop.assert_called_once()
     spotify_worker.wait.assert_called_once_with(2000)
     lyrics_worker.wait.assert_called_once_with(6000)
+
+
+def test_shutdown_hides_tray_before_exit():
+    config = MagicMock()
+    config.refresh_token = "existing_refresh"
+    config.config_dir = "config-dir"
+    fresh_config = MagicMock()
+    tray = MagicMock()
+
+    with (
+        patch("src.main.Config", side_effect=[config, fresh_config]),
+        patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock(isRunning=lambda: False)),
+    ):
+        app = App()
+        app._tray = tray
+        app.shutdown()
+
+    tray.hide.assert_called_once()
 
 
 def test_single_instance_guard_activates_existing_instance(qtbot):

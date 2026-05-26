@@ -154,6 +154,50 @@ class TestSpotifyWorker401:
         mock_refresh.assert_called()
 
 
+class TestSpotifyWorkerDiagnostics:
+    @patch("src.spotify_worker.logging.info")
+    @patch("src.spotify_worker.httpx.get")
+    def test_200_track_response_logs_playback_summary(self, mock_get, log_info):
+        from src.spotify_worker import SpotifyWorker
+
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            text='{"is_playing": true}',
+            json=lambda: {
+                "is_playing": True,
+                "progress_ms": 45000,
+                "currently_playing_type": "track",
+                "item": {
+                    "id": "track_123",
+                    "name": "Test Song",
+                    "uri": "spotify:track:track_123",
+                    "duration_ms": 240000,
+                    "artists": [{"name": "Artist A"}],
+                    "album": {"name": "Test Album"},
+                },
+            },
+        )
+
+        mock_config = MagicMock()
+        mock_config.token_expires_at = int(time.time()) + 3600
+        mock_config.access_token = "valid"
+
+        worker = SpotifyWorker(mock_config)
+        worker._poll_once()
+
+        log_info.assert_any_call(
+            "Spotify playback summary: status=%s is_playing=%s type=%s "
+            "track_id=%s track=%s artist=%s progress_ms=%s",
+            200,
+            True,
+            "track",
+            "track_123",
+            "Test Song",
+            "Artist A",
+            45000,
+        )
+
+
 class TestSpotifyWorkerNetworkError:
     @patch("src.spotify_worker.httpx.get")
     def test_network_error_emits_signal(self, mock_get):

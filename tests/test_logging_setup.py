@@ -19,3 +19,10 @@ def test_configure_logging_writes_rotating_file_under_appdata(tmp_path, monkeypa
     assert handlers[-1].baseFilename == str(log_path)
     assert handlers[-1].maxBytes == 1_000_000
     assert handlers[-1].backupCount == 3
+
+
+def test_log_file_path_under_appdata(monkeypatch, tmp_path):
+    from src.logging_setup import log_file_path
+
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    assert log_file_path() == tmp_path / "spotify-lyrics-widget" / "widget.log"
