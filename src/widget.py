@@ -3,14 +3,12 @@ import logging
 import sys
 import time
 
-from PyQt6.QtCore import QPoint, QRectF, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QCloseEvent,
     QEnterEvent,
     QFont,
     QMouseEvent,
-    QPainterPath,
-    QRegion,
 )
 from PyQt6.QtWidgets import (
     QFrame,
@@ -104,9 +102,11 @@ class LyricsWidget(QWidget):
         self._panel = QFrame(self)
         self._panel.setObjectName("lyricsPanel")
         self._panel.setMouseTracking(True)
+        # Flat panel corners (0px); the rounded look comes from the DWM window
+        # corner, so the panel must not draw a second, mismatched radius.
         self._panel.setStyleSheet(
             f"#lyricsPanel {{ background-color: {PANEL_BACKGROUND}; "
-            f"border: 1px solid {SPOTIFY_GREEN}; border-radius: 12px; }}"
+            f"border: 1px solid {SPOTIFY_GREEN}; border-radius: 0px; }}"
         )
 
         layout = QVBoxLayout(self._panel)

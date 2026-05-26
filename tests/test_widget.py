@@ -20,18 +20,23 @@ def test_widget_flags(qtbot):
     assert flags & Qt.WindowType.WindowStaysOnTopHint
 
 
-def test_widget_uses_rounded_mask_and_rounded_panel(qtbot):
+def test_widget_uses_dwm_rounding_and_opaque_panel(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
+    # Opaque window (not translucent); rounded corners come from the Windows DWM,
+    # not a QRegion mask, so no mask is set.
     assert not widget.testAttribute(Qt.WidgetAttribute.WA_TranslucentBackground)
-    assert not widget.mask().isEmpty()
-    assert widget._panel.objectName() == "lyricsPanel"
+    assert widget.mask().isEmpty()
+    assert "background-color: #121212" in widget.styleSheet()
 
+    # Panel keeps the Spotify-green border; its own corners are flat (0px) so they
+    # don't clash with the DWM-rounded window.
+    assert widget._panel.objectName() == "lyricsPanel"
     panel_style = widget._panel.styleSheet()
     assert "background-color: #121212" in panel_style
     assert "border: 1px solid #1DB954" in panel_style
-    assert "border-radius: 12px" in panel_style
+    assert "border-radius: 0px" in panel_style
 
 
 def test_track_label_font_is_larger_and_demibold(qtbot):
