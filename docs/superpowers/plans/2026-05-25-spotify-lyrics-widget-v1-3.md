@@ -753,6 +753,90 @@ git commit -m "feat: add Start-menu/desktop shortcut installer (V1.3)"
 
 ---
 
+## Hotfix Addendum (2026-05-26, post-implementation)
+
+Two bugs were discovered during live testing after V1.3 tasks 0–3 were implemented and committed.
+Both were diagnosed, fixed, and verified in the same session.
+
+### Hotfix A: Font crash — NotoSansTC-VF.ttf access violation
+
+**Symptom:** Widget freezes mid-playback. The SpotifyWorker QThread keeps polling (log shows
+playback summaries), but the UI main thread is dead — no heartbeat, no track-change slot fires,
+widget visually stuck on the last song before the crash.
+
+**Root cause:** `QFontDatabase.addApplicationFont()` on the 36 MB variable font
+`NotoSansTC-VF.ttf` triggers a `Windows fatal exception: access violation` inside Qt 6.11.0's
+font rasterizer. The crash kills the UI main thread silently (no Python traceback under
+`pythonw.exe` before the `sys.excepthook` fix). The QThread survives because Qt threads are
+OS-level threads independent of the crashed main thread.
+
+**Fix (`src/fonts.py` rewrite):**
+
+Replaced the bundled-font loader with system font detection:
+
+```python
+def load_app_font() -> str:
+    global _loaded_family
+    families = QFontDatabase.families()
+    for preferred in ("Microsoft JhengHei UI", "Microsoft JhengHei", "Segoe UI"):
+        if preferred in families:
+            _loaded_family = preferred
+            return preferred
+    _loaded_family = FALLBACK_FAMILY
+    return FALLBACK_FAMILY
+```
+
+Microsoft JhengHei UI (微軟正黑體) supports the same CJK range as Noto Sans TC and is
+pre-installed on all Chinese-locale Windows. The font file stays in `assets/fonts/` but is
+no longer loaded by `addApplicationFont`.
+
+`FALLBACK_FAMILY` changed from `"Segoe UI"` to `"Microsoft JhengHei UI"`.
+
+`tests/test_fonts.py` updated: removed the monkeypatch `_FONT_DIR` test (no longer relevant),
+kept the fallback default test and the system-font load test.
+
+### Hotfix B: Widget not repainting after track change
+
+**Symptom:** After fixing the font crash, the UI main thread is alive (heartbeat log fires
+every 30 s), `_on_track_changed` slot fires (log shows correct new track name), `QLabel.text()`
+returns the updated string — but the widget visually still shows the old song. Switching apps
+and back, or minimizing/restoring, forces the repaint and the correct text appears.
+
+**Root cause:** Qt frameless translucent windows (`WA_TranslucentBackground` +
+`FramelessWindowHint`) on Windows use layered window compositing (DWM). `QLabel.setText()` does
+not always mark the layered surface as dirty, so Windows never repaints the pixel buffer. This
+is a known Qt rendering edge case on Windows with translucent frameless windows.
+
+**Fix (`src/main.py`):**
+
+Added `self._widget.repaint()` after updating labels in `_on_track_changed`:
+
+```python
+self._widget.update_track_info(state.track_name, state.artist_name)
+self._widget.set_duration(state.duration_ms)
+self._widget.set_lyric_text("")
+self._widget.repaint()  # force DWM to redraw the layered surface
+```
+
+### Additional diagnostics added alongside hotfixes
+
+These logging improvements were added to diagnose the freeze and kept for future debugging:
+
+| Location | What |
+|----------|------|
+| `src/main.py` `_on_track_changed` | Log track_id + track_name when slot fires; log actual `QLabel.text()` and `isVisible()` after update |
+| `src/main.py` `_on_state_synced` | UI heartbeat every 30 s (progress + is_playing) |
+| `src/main.py` `shutdown` | Log when event loop exits |
+| `src/logging_setup.py` | `sys.excepthook` → log uncaught exceptions (critical for `pythonw` where stderr is lost) |
+| `src/spotify_worker.py` | Playback summary on each poll (track/artist/progress) |
+
+### Commits
+
+- `8fe86f9` — font crash fix + crash logging + playback diagnostics (merged to master as `d5ca276`)
+- Second commit (this addendum) — repaint fix + label diagnostics + heartbeat + doc updates
+
+---
+
 ## Execution Handoff
 
 **Plan complete and saved to `docs/superpowers/plans/2026-05-25-spotify-lyrics-widget-v1-3.md`. Two execution options:**
