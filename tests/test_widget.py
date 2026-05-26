@@ -145,6 +145,31 @@ def test_update_progress_bar(qtbot):
     assert widget._progress_bar.value() == 50
 
 
+def test_progress_updates_without_lyrics(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(200000)
+    widget.set_lyrics([])  # no synced lyrics for this track
+    widget.resync_local_timer(100000, True, time.monotonic())
+
+    widget._on_ui_tick()
+
+    assert widget._progress_bar.value() > 0
+
+
+def test_unavailable_keeps_status_text_and_updates_progress(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(200000)
+    widget.show_unavailable()
+    widget.resync_local_timer(100000, True, time.monotonic())
+
+    widget._on_ui_tick()
+
+    assert widget._progress_bar.value() > 0
+    assert widget._lyric_label.text() == "lyrics unavailable"
+
+
 def test_show_no_lyrics_state(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)

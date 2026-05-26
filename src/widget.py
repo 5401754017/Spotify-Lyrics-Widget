@@ -235,15 +235,19 @@ class LyricsWidget(QWidget):
         self._track_label.setText(text)
 
     def _on_ui_tick(self):
-        if not self._is_playing or not self._lyrics:
+        if not self._is_playing:
             return
 
         estimated_ms = self._last_synced_ms + int(
             (time.monotonic() - self._last_sync_time) * 1000
         )
-        self._update_lyric_display(estimated_ms)
+        # Progress depends only on playback, never on lyrics availability.
         if self._duration_ms > 0:
             self.update_progress(min(estimated_ms / self._duration_ms, 1.0))
+        # Lyric line only advances when this track actually has synced lyrics;
+        # otherwise the lyric lane keeps its status text (no lyrics / unavailable).
+        if self._lyrics:
+            self._update_lyric_display(estimated_ms)
 
     def _update_lyric_display(self, progress_ms: int):
         index = find_current_line(self._lyrics, progress_ms)

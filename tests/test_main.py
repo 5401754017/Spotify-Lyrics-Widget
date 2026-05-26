@@ -145,6 +145,25 @@ def test_track_change_updates_widget_without_forced_visual_refresh():
     widget.force_visual_refresh.assert_not_called()
 
 
+def test_track_change_clears_stale_lyrics():
+    app, _, widget = _make_app()
+    state = PlayerState(
+        track_id="new",
+        track_name="New Song",
+        track_uri="spotify:track:new",
+        artist_name="Artist",
+        album_name="Album",
+        duration_ms=180000,
+        progress_ms=0,
+        is_playing=True,
+        is_track=True,
+    )
+
+    app._on_track_changed(state)
+
+    widget.set_lyrics.assert_called_once_with([])
+
+
 def test_start_creates_and_shows_tray():
     app, config, _ = _make_app()
     config.client_id = "client"
