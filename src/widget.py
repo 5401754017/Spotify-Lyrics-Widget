@@ -168,24 +168,6 @@ class LyricsWidget(QWidget):
     def update_progress(self, ratio: float):
         self._progress_bar.setValue(int(ratio * 100))
 
-    def force_visual_refresh(self):
-        self._repaint_visual_tree()
-        QTimer.singleShot(0, self._repaint_visual_tree)
-
-    def _visual_refresh_widgets(self):
-        return (
-            self._track_label,
-            self._lyric_label,
-            self._progress_bar,
-            self._panel,
-            self,
-        )
-
-    def _repaint_visual_tree(self):
-        for widget in self._visual_refresh_widgets():
-            widget.update()
-            widget.repaint()
-
     def resync_local_timer(
         self, progress_ms: int, is_playing: bool, local_timestamp: float
     ):

@@ -123,8 +123,9 @@ def test_connect_signals_wires_rate_limit_state():
     )
 
 
-def test_track_change_forces_visual_refresh():
+def test_track_change_updates_widget_without_forced_visual_refresh():
     app, _, widget = _make_app()
+    widget.force_visual_refresh = MagicMock()
     state = PlayerState(
         track_id="new",
         track_name="New Song",
@@ -141,7 +142,7 @@ def test_track_change_forces_visual_refresh():
 
     widget.update_track_info.assert_called_once_with("New Song", "Artist")
     widget.set_lyric_text.assert_called_once_with("")
-    widget.force_visual_refresh.assert_called_once()
+    widget.force_visual_refresh.assert_not_called()
 
 
 def test_start_creates_and_shows_tray():

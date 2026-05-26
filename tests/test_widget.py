@@ -124,30 +124,11 @@ def test_show_event_refreshes_overlay_and_elided_title(qtbot, monkeypatch):
     assert "position" in calls
 
 
-def test_force_visual_refresh_repaints_now_and_after_event_loop(qtbot, monkeypatch):
-    widget = LyricsWidget()
-    qtbot.addWidget(widget)
-    calls = []
-
-    monkeypatch.setattr(widget, "_repaint_visual_tree", lambda: calls.append("refresh"))
-
-    widget.force_visual_refresh()
-
-    assert calls == ["refresh"]
-    qtbot.waitUntil(lambda: calls == ["refresh", "refresh"], timeout=500)
-
-
-def test_visual_refresh_includes_labels_panel_and_window(qtbot):
+def test_widget_has_no_forced_visual_refresh_api(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
-    refresh_targets = widget._visual_refresh_widgets()
-
-    assert widget._track_label in refresh_targets
-    assert widget._lyric_label in refresh_targets
-    assert widget._progress_bar in refresh_targets
-    assert widget._panel in refresh_targets
-    assert widget in refresh_targets
+    assert not hasattr(widget, "force_visual_refresh")
 
 
 def test_update_lyric_line(qtbot):
