@@ -205,7 +205,19 @@ class SpotifyWorker(QThread):
         if response.status_code != 200:
             return
 
-        state = parse_player_state(response.json())
+        data = response.json()
+        state = parse_player_state(data)
+        logging.info(
+            "Spotify playback summary: status=%s is_playing=%s type=%s "
+            "track_id=%s track=%s artist=%s progress_ms=%s",
+            response.status_code,
+            state.is_playing,
+            data.get("currently_playing_type", "unknown"),
+            state.track_id,
+            state.track_name,
+            state.artist_name,
+            state.progress_ms,
+        )
         if not state.is_track:
             self.not_a_track.emit()
             self._previous_state = state

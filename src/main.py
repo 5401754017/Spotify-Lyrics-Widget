@@ -94,6 +94,7 @@ class App(QObject):
         self._lyrics_worker = LyricsWorker()
         self._current_track_id: str | None = None
         self._tray: TrayIcon | None = None
+        self._last_heartbeat_ts: float = 0.0
         self._connect_lifecycle_signals()
 
     def _connect_lifecycle_signals(self):
@@ -179,6 +180,11 @@ class App(QObject):
 
     @pyqtSlot(object)
     def _on_track_changed(self, state: PlayerState):
+        logging.info(
+            "UI slot _on_track_changed fired: track_id=%s track=%s",
+            state.track_id,
+            state.track_name,
+        )
         self._current_track_id = state.track_id
         self._widget.update_track_info(state.track_name, state.artist_name)
         self._widget.set_duration(state.duration_ms)
@@ -196,6 +202,10 @@ class App(QObject):
 
     @pyqtSlot(int, bool, float)
     def _on_state_synced(self, progress_ms: int, is_playing: bool, local_ts: float):
+        now = time.monotonic()
+        if now - self._last_heartbeat_ts > 30:
+            logging.info("UI heartbeat alive: progress=%s is_playing=%s", progress_ms, is_playing)
+            self._last_heartbeat_ts = now
         self._widget.resync_local_timer(progress_ms, is_playing, local_ts)
 
     @pyqtSlot(bool)
@@ -259,6 +269,7 @@ class App(QObject):
         self._widget.show_unavailable()
 
     def shutdown(self):
+        logging.info("App.shutdown called — event loop is exiting")
         if self._tray is not None:
             self._tray.hide()
         position = self._widget.pos()

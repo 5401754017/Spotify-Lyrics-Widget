@@ -1,27 +1,25 @@
-from pathlib import Path
+import logging
 
 from PyQt6.QtGui import QFontDatabase
 
 
-_FONT_DIR = Path(__file__).resolve().parent.parent / "assets" / "fonts"
-_FONT_FILES = ("NotoSansTC-VF.ttf",)
-FALLBACK_FAMILY = "Segoe UI"
+FALLBACK_FAMILY = "Microsoft JhengHei UI"
 
 _loaded_family: str | None = None
+
+_logger = logging.getLogger(__name__)
 
 
 def load_app_font() -> str:
     global _loaded_family
-    family = FALLBACK_FAMILY
-    for file_name in _FONT_FILES:
-        font_id = QFontDatabase.addApplicationFont(str(_FONT_DIR / file_name))
-        if font_id < 0:
-            continue
-        families = QFontDatabase.applicationFontFamilies(font_id)
-        if families:
-            family = families[0]
-    _loaded_family = family
-    return family
+    families = QFontDatabase.families()
+    for preferred in ("Microsoft JhengHei UI", "Microsoft JhengHei", "Segoe UI"):
+        if preferred in families:
+            _loaded_family = preferred
+            _logger.info("Using system font: %s", preferred)
+            return preferred
+    _loaded_family = FALLBACK_FAMILY
+    return FALLBACK_FAMILY
 
 
 def app_font_family() -> str:

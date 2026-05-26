@@ -3,17 +3,11 @@ from src import fonts
 
 def test_app_font_family_defaults_to_fallback():
     fonts._loaded_family = None
-    assert fonts.app_font_family() == "Segoe UI"
+    assert fonts.app_font_family() == fonts.FALLBACK_FAMILY
 
 
-def test_load_app_font_falls_back_when_files_missing(qtbot, monkeypatch, tmp_path):
-    fonts._loaded_family = None
-    monkeypatch.setattr(fonts, "_FONT_DIR", tmp_path)
-    assert fonts.load_app_font() == "Segoe UI"
-
-
-def test_load_app_font_loads_bundled_noto(qtbot):
+def test_load_app_font_picks_system_font(qtbot):
     fonts._loaded_family = None
     family = fonts.load_app_font()
-    assert "Noto" in family
+    assert family
     assert fonts.app_font_family() == family
