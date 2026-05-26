@@ -189,6 +189,13 @@ class App(QObject):
         self._widget.update_track_info(state.track_name, state.artist_name)
         self._widget.set_duration(state.duration_ms)
         self._widget.set_lyric_text("")
+        self._widget.repaint()
+        logging.info(
+            "UI label after update: track_label='%s' lyric_label='%s' visible=%s",
+            self._widget._track_label.text(),
+            self._widget._lyric_label.text(),
+            self._widget.isVisible(),
+        )
 
         self._lyrics_worker.request_lyrics(
             TrackInfo(
