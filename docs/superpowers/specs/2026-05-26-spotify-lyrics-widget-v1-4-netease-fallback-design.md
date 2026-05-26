@@ -1,7 +1,8 @@
 # Spotify Lyrics Widget V1.4 — NetEase Lyrics Fallback (Design)
 
 Date: 2026-05-26
-Status: Approved (Claude × user brainstorm, 2026-05-26). Next step: writing-plans.
+Status: Approved (Claude × user brainstorm, 2026-05-26). Implementation plan exists at
+`docs/superpowers/plans/2026-05-26-spotify-lyrics-widget-v1-4.md`.
 
 ## Goal
 
@@ -43,10 +44,20 @@ can be added later (one at a time) — out of scope for V1.4.
   - `fetch_lyrics_from_netease(info: TrackInfo) -> list[tuple[int, str]] | None`
   - Flow: search by track + artist → rank candidates by track/artist/duration closeness
     (same scoring idea as the existing `rank_search_results`) → fetch the chosen song's LRC →
-    `parse_lrc()` → return parsed `(timestamp_ms, line)` list, or `None` if nothing suitable.
+    `parse_lrc()` → return parsed `(timestamp_ms, line)` list, or `None` only when NetEase
+    was reachable and produced a confirmed no-match/no-usable-lyric result.
+  - Temporary API failures raise `NeteaseUnavailableError` instead of returning `None`.
+    Examples: timeout, connection error, 429, 5xx/non-200, malformed JSON. This keeps a real
+    miss separate from "fallback source is unavailable right now".
   - Uses NetEase **public endpoints** (`music.163.com/api` search + song-lyric) with a
     `Referer: https://music.163.com` and a normal User-Agent header. **No cookie / no auth.**
   - Takes only the primary LRC (`lrc.lyric`); ignores translation/romaji sub-tracks for now.
+  - Maintains a small process-local cooldown for NetEase 429. This cooldown is intentionally
+    global for the NetEase fallback (search and lyric endpoints both skip) because either
+    endpoint returning 429 means the fallback source is pushing back. When `Retry-After` is
+    present, respect it; otherwise use a short default cooldown. While cooldown is active,
+    skip NetEase, log `cooldown active`, raise `NeteaseUnavailableError`, and do not call the
+    endpoint.
 
 - **`src/config.py`** — add `netease_fallback: bool = True` to the persisted defaults.
 
@@ -65,25 +76,31 @@ track change → LyricsWorker.run()
                  None & flag on→ fetch_lyrics_from_netease(info)
                                    result → cache + lyrics_ready
                                    None   → cache NO_LYRICS + no_lyrics
+                                   NeteaseUnavailableError → lyrics_unavailable, no cache
                  None & flag off→ cache NO_LYRICS + no_lyrics   (unchanged)
                LRCLIB raises (network/5xx) → lyrics_unavailable (unchanged; NO fallback)
 ```
 
 ## Error handling (brake + visibility)
 
-- All NetEase failures — timeout, connection error, non-200, malformed JSON, unparseable LRC
-  — are caught inside `fetch_lyrics_from_netease`, **logged**, and turned into a `None` return
-  so the worker falls through to `no_lyrics`. A fallback failure must never crash, block, or
-  spam the main flow (matches the user's global rules: external-API loops need a brake;
-  errors go to the log, never silently swallowed with bare `except: pass`).
-- One INFO log line per lookup recording hit/miss (and the matched NetEase title on hit), so
-  the user can later judge NetEase's real hit-rate on their library.
+- NetEase **confirmed misses** return `None`: no search result, no acceptable candidate, no
+  LRC for the selected candidate, or parsed LRC has no timed lines.
+- NetEase **temporary unavailable** states raise `NeteaseUnavailableError`: timeout,
+  connection error, 429, 5xx/non-200, malformed JSON. The worker catches it, emits the same
+  temporary unavailable UI state used for LRCLIB outages, and does **not** cache the failure.
+- 429 handling must read `Retry-After`; if absent, use a short default cooldown. During
+  cooldown, do not call NetEase again. This is the brake that prevents repeated lookups from
+  hammering the endpoint. The cooldown is global for the NetEase fallback, not per endpoint.
+- Log one clear line per lookup outcome with the real reason: hit, confirmed miss, HTTP
+  status, timeout, malformed JSON with a capped response snippet, 429 retry window, or
+  cooldown active. The UI may stay simple, but `widget.log` must preserve the real cause.
 
 ## Caching
 
 Reuse the existing session `LyricsCache` (keyed by Spotify track ID). A NetEase hit is cached
-exactly like an LRCLIB hit; a both-miss is cached as `NO_LYRICS`. No change to cache shape —
-the fallback result simply flows into the same `lyrics_ready` / cache path.
+exactly like an LRCLIB hit. A both-miss is cached as `NO_LYRICS` only when LRCLIB returned
+`None` and NetEase also returned a confirmed `None`. Temporary NetEase unavailable/cooldown
+states are not cached.
 
 ## Testing
 
@@ -91,19 +108,24 @@ the fallback result simply flows into the same `lyrics_ready` / cache path.
   - candidate ranking picks the closest synced match (name/artist/duration)
   - parses returned LRC into sorted `(ms, line)` tuples
   - search with no results → `None`
-  - HTTP error / non-200 / malformed body → `None` (never raises)
+  - confirmed no candidate/no lyric/unparseable timed lines → `None`
+  - timeout / connection error / non-200 / malformed JSON → `NeteaseUnavailableError`
+  - 429 with `Retry-After` sets cooldown; a second call during cooldown skips HTTP and raises
+    `NeteaseUnavailableError`
 - `tests/test_lyrics_worker.py` (extend):
   - LRCLIB `None` + flag ON → `fetch_lyrics_from_netease` is called; its hit → `lyrics_ready`
   - LRCLIB `None` + flag OFF → NetEase is **not** called → `no_lyrics`
   - LRCLIB raises → NetEase not called (still `lyrics_unavailable`)
+  - LRCLIB `None` + NetEase unavailable → `lyrics_unavailable`, and no `NO_LYRICS` cache
 
 ## Risks (carry into the plan)
 
 - NetEase public endpoints are unofficial — they may change or break. Acceptable: it is a
   fallback; if it breaks, LRCLIB (the primary) is unaffected and the user just sees the
-  pre-V1.4 "no lyrics" behaviour.
+  temporary `lyrics unavailable` behaviour.
 - Region/anti-abuse: requests to `music.163.com` generally work from Taiwan, but individual
-  endpoints occasionally rate-limit or block. Handled by the catch-all → treat as a miss.
+  endpoints occasionally rate-limit or block. Do not treat this as a miss: log the real
+  reason, respect 429 `Retry-After`, and avoid caching.
 - Coverage gap for 台語 / indie remains; revisit with a second source later if needed.
 
 ## Out of scope (V1.4)

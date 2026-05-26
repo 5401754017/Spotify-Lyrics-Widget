@@ -221,22 +221,23 @@ def test_resync_local_timer(qtbot):
     assert widget._is_playing is True
 
 
-def test_offline_indicator(qtbot):
+def test_offline_state_uses_lyric_lane(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
     widget.show()
     widget.show_offline()
-    assert widget._offline_label.isVisible()
+    assert widget._lyric_label.text() == "offline"
     widget.hide_offline()
-    assert not widget._offline_label.isVisible()
+    assert widget._lyric_label.text() == ""
 
 
-def test_offline_indicator_does_not_move_content(qtbot):
+def test_offline_state_does_not_move_content(qtbot):
     widget = _shown_widget(qtbot)
 
     track_geometry = widget._track_label.geometry()
     lyric_geometry = widget._lyric_label.geometry()
     progress_geometry = widget._progress_bar.geometry()
+    widget_size = widget.size()
 
     widget.show_offline()
     qtbot.wait(50)
@@ -244,17 +245,25 @@ def test_offline_indicator_does_not_move_content(qtbot):
     assert widget._track_label.geometry() == track_geometry
     assert widget._lyric_label.geometry() == lyric_geometry
     assert widget._progress_bar.geometry() == progress_geometry
+    assert widget.size() == widget_size
 
 
-def test_offline_indicator_is_overlay_child_of_panel(qtbot):
+def test_offline_state_has_no_overlay_child(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
-    assert widget._offline_label.parent() is widget._panel
-    assert widget._offline_label not in [
-        widget._panel.layout().itemAt(index).widget()
-        for index in range(widget._panel.layout().count())
-    ]
+    assert not hasattr(widget, "_offline_label")
+
+
+def test_hide_offline_does_not_clear_real_lyric(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show_offline()
+    widget.set_lyric_text("new lyric after recovery")
+
+    widget.hide_offline()
+
+    assert widget._lyric_label.text() == "new lyric after recovery"
 
 
 def test_rate_limited_state_uses_fixed_layout(qtbot):

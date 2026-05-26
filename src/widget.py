@@ -12,6 +12,7 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from src.fonts import app_font_family
 from src.lrc_parser import find_current_line
 
 
@@ -24,7 +25,7 @@ UI_TIMER_INTERVAL_MS = 150
 WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 20
-LYRIC_LANE_HEIGHT = 56
+LYRIC_LANE_HEIGHT = 60
 OVERLAY_GUTTER_WIDTH = 92
 
 
@@ -84,7 +85,7 @@ class LyricsWidget(QWidget):
         top_row.setContentsMargins(0, 0, 0, 0)
         top_row.setSpacing(0)
         self._track_label = QLabel("")
-        self._track_label.setFont(QFont("Segoe UI", 10, QFont.Weight.DemiBold))
+        self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
         self._track_label.setStyleSheet(f"color: {WHITE};")
         self._track_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         top_row.addWidget(self._track_label, stretch=1)
@@ -100,15 +101,8 @@ class LyricsWidget(QWidget):
         self._close_btn.setVisible(False)
         layout.addWidget(self._top_row)
 
-        self._offline_label = QLabel("! offline", self._panel)
-        self._offline_label.setFont(QFont("Segoe UI", 8))
-        self._offline_label.setStyleSheet("color: #FF6B6B;")
-        self._offline_label.setAlignment(Qt.AlignmentFlag.AlignRight)
-        self._offline_label.setFixedSize(62, 18)
-        self._offline_label.setVisible(False)
-
         self._lyric_label = QLabel("")
-        self._lyric_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
+        self._lyric_label.setFont(QFont(app_font_family(), 16, QFont.Weight.Bold))
         self._lyric_label.setStyleSheet(f"color: {SPOTIFY_GREEN};")
         self._lyric_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lyric_label.setWordWrap(True)
@@ -193,18 +187,17 @@ class LyricsWidget(QWidget):
         )
 
     def show_offline(self):
-        self._offline_label.setVisible(True)
+        self._lyrics = []
+        self._lyric_label.setText("offline")
 
     def hide_offline(self):
-        self._offline_label.setVisible(False)
+        if self._lyric_label.text() == "offline":
+            self._lyric_label.setText("")
 
     def _position_overlay_controls(self):
         if hasattr(self, "_close_btn"):
             panel_width = max(self._panel.width(), self.width())
             self._close_btn.move(panel_width - 30, 8)
-        if hasattr(self, "_offline_label"):
-            panel_width = max(self._panel.width(), self.width())
-            self._offline_label.move(panel_width - OVERLAY_GUTTER_WIDTH, 9)
 
     def _refresh_track_label_text(self):
         if not self._track_text_full:

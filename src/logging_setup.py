@@ -10,12 +10,15 @@ MAX_LOG_BYTES = 1_000_000
 BACKUP_COUNT = 3
 
 
+def log_file_path() -> Path:
+    appdata = os.environ.get("APPDATA", str(Path.home()))
+    return Path(appdata) / LOG_DIR_NAME / LOG_FILE_NAME
+
+
 def configure_logging() -> Path:
     """Configure file logging before the app hides its console."""
-    appdata = os.environ.get("APPDATA", str(Path.home()))
-    log_dir = Path(appdata) / LOG_DIR_NAME
-    log_dir.mkdir(parents=True, exist_ok=True)
-    log_path = log_dir / LOG_FILE_NAME
+    log_path = log_file_path()
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)

@@ -14,15 +14,16 @@ A Windows desktop floating widget that displays real-time synced lyrics for the 
 
 ## Lyrics Source
 
-- **Primary and only source:** lrclib.net (free, no auth required, ~3M tracks)
+- **Primary source:** lrclib.net (free, no auth required, ~3M tracks)
 - **Primary endpoint:** `GET /api/get` with `track_name`, `artist_name`, `album_name`, `duration`. Duration must be converted from Spotify's milliseconds to seconds (integer).
 - **Secondary endpoint:** If exact match returns nothing or has no `syncedLyrics`, fallback to `GET /api/search?track_name=...&artist_name=...`. Rank results instead of taking the first one:
   1. Must have `syncedLyrics`
   2. Prefer closest duration match (within 5 seconds tolerance)
   3. Prefer closest normalized track name / artist name match
-- **Session cache:** Cache both successful and failed lookups by Spotify track ID. Avoid redundant API calls when the user loops a song or goes back to a previous track.
+- **Session cache:** Cache successful lookups and confirmed "no lyrics" misses by Spotify track ID. Avoid redundant API calls when the user loops a song or goes back to a previous track. Do not cache temporary API/network/rate-limit failures as "no lyrics".
 - **Only use `syncedLyrics`** (LRC format with timestamps). If `syncedLyrics` is null, display "no synced lyrics available" regardless of whether `plainLyrics` exists
-- **No external fallback sources.** No Genius, no Musixmatch, no scraping
+- **V1.4 fallback:** Optional NetEase fallback may run only after LRCLIB returns a confirmed miss. NetEase timeout / non-200 / malformed response / 429 is temporary unavailable, must be logged with the real reason, must respect `Retry-After`, and must not be cached as a miss.
+- **No private Spotify-cookie fallback in V1.4.** Do not use `sp_dc` / unofficial Spotify lyrics cookie flows for V1.4. No Genius, no Musixmatch, no scraping.
 
 ---
 
@@ -119,17 +120,17 @@ PyQt6 Signals/Slots:
 ### Hovered State (V2)
 
 ```
-+--------------------------------------------+
-|         Song Name — Artist Name          ✕ |  ← close button appears top-right
-|            ⏮      ⏯      ⏭                |  ← playback control row appears
-|                                            |
-|        current lyric line here             |
-|                                            |
-|████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
-+--------------------------------------------+
+0     5                        50     60          80      90 95 100
++------------------------------------------------------------------+
+|     Song Name - Artist Name        [prev play next]        [X]   |
+|                                                                  |
+|                 current lyric / no synced lyrics / offline       |
+|                                                                  |
+|████████████░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░|
++------------------------------------------------------------------+
 ```
 
-V1: hover shows ✕ close button only (must have a way to close the app). V2: hover adds the playback control row (play/pause, next, prev) below the song info. The ＋ / 📋 playlist buttons are deferred out of V2 (see "Playlist Add Feature" below).
+V1/V1.2: hover shows the close button only. V1.3 moves network offline status into the lyric lane, not a right-top overlay. V2 uses fixed top-row slots: title roughly 5-50, controls roughly 60-80, close roughly 90-95. The 50-60 and 80-90 ranges are intentional buffer space, not stretch areas. The controls appear on hover inside their own slot and never share space with the title or close button. Playlist buttons are deferred out of V2 (see "Playlist Add Feature" below).
 
 ### Visual Style
 
@@ -140,7 +141,7 @@ V1: hover shows ✕ close button only (must have a way to close the app). V2: ho
 - **Progress bar:** Spotify green `#1DB954` on dark gray track
 - **Close button:** White
 - **Design:** Completely flat. No transparency, no reflections, no highlights, no gradients
-- **Font:** System sans-serif
+- **Font:** V1.3 loads bundled Noto Sans TC for title + lyric; fallback is `Segoe UI` if the bundled font is unavailable.
 
 ### Window Behavior
 
@@ -222,13 +223,13 @@ Binary search on the sorted timestamp list. Find the last entry where `timestamp
 |---|---|
 | Token expired (HTTP 401) | Auto-refresh with refresh token. If response includes new refresh_token, save it; otherwise keep existing. Retry the failed request. |
 | Refresh token invalid | Show prompt "please re-authorize", restart PKCE OAuth flow |
-| Network disconnected (cannot reach Spotify) | Freeze on last state, show offline indicator icon, retry every 5 seconds |
+| Network disconnected (cannot reach Spotify) | Freeze on last state, show central `offline` text in the lyric lane, retry every 5 seconds. Do not show a right-top offline overlay. |
 | lrclib query fails (timeout / 5xx) | Display temporary "lyrics unavailable" state. Do NOT cache this failure. Allow retry if user returns to this track later. |
 | lrclib returns success but no syncedLyrics | Cache "no lyrics" for this track ID. Display "no synced lyrics". |
 | Spotify not playing anything | Display "not playing", progress bar at zero, continue polling |
 | Non-track playback (podcast / ad) | Display "not a track", hide progress bar, skip lyrics/playlist logic |
-| Playback control API fails (V2) | Silent failure (user notices via Spotify app) |
-| Add to playlist fails (V2) | Plus button flashes red briefly |
+| Playback control API fails (V2) | Log the HTTP status/error with a capped body snippet. For 429, respect `Retry-After` and apply a short local cooldown so repeated clicks do not hammer Spotify. UI can otherwise remain unchanged. Do not queue automatic retries for user-click controls; the next user click after cooldown dispatches normally. This applies only to playback-control clicks, not lyrics lookup retry behaviour. |
+| Add to playlist fails (deferred playlist phase) | Log the HTTP status/error; playlist UI behavior is decided in the later playlist phase. |
 | First launch, no config file | Create default config, prompt for `client_id`, then start OAuth |
 | Stale lyrics response | If lyrics worker returns result for a track_id that is no longer current, silently discard |
 
@@ -252,7 +253,7 @@ Location: `%APPDATA%/spotify-lyrics-widget/config.json` (per-user, standard Wind
 
 Notes:
 - No `client_secret` (PKCE flow does not use one)
-- `default_playlist_id` stores a bare Spotify playlist ID, not a URI (V2)
+- `default_playlist_id` stores a bare Spotify playlist ID, not a URI (deferred playlist phase, not V2)
 - `token_expires_at` is a Unix timestamp in seconds
 
 ---
@@ -289,22 +290,25 @@ Add after V1.3. **Scope confirmed 2026-05-25: playback controls + marquee only.*
 Playlist add/picker is split out into a separate later phase (see "Playlist Add Feature"
 above) — do NOT build it in V2.
 
-1. Hover-to-reveal control row (play/pause, next, prev)
+1. Hover-to-reveal playback controls (play/pause, next, prev) inside the fixed controls slot
 2. Additional OAuth scope: `user-modify-playback-state` only (playlist scopes deferred with
    the playlist phase)
-3. Title rendering rework (folds in a decided V1.x polish):
-   - **At rest: left-align the title.** It is currently set to `AlignCenter`, but the
-     V1.1/V1.2 layout reserves a right-side overlay gutter (`OVERLAY_GUTTER_WIDTH`, for the
-     ✕ close button + offline label) with no matching left gutter, so the centered title
-     sits ~half-a-gutter (~46px) left of the panel's true center and looks lopsided.
-     Left-aligning is cleaner and is the natural rest state for the marquee below.
+3. Title/control layout rework (folds in a decided V1.x polish):
+   - **At rest: left-align the title inside a fixed title slot.** Do not center the title
+     against the whole window and do not reserve a shared right-side overlay gutter. The top
+     row has explicit slots: title, controls, close.
    - **On hover: marquee the full title** per the V1.2 plan's "V2 Future Notes" (dedicated
      `MarqueeLabel`, fixed geometry, clipped painting, slow ping-pong, scroll the rendered
      full string — never substring-slice, to stay CJK/Unicode-correct). Only animate when
      the full title is wider than the available width.
-   - Decided 2026-05-25: do NOT ship this as a standalone V1.3. The alignment fix is folded
-     here because V2 reworks title rendering anyway. Until then, the lopsided-center title
-     is an accepted cosmetic limitation.
+   - **Controls stay in their own slot.** Previous overlay/gutter wording is rejected
+     because it can collide with offline/close/title states. V1.3 already moved `offline`
+     into the lyric lane, so V2 only needs title, controls, and close in the top row.
+   - **Clicks have a brake.** Playback controls should drop/debounce repeated clicks while a
+     request is already in flight, and 429 cooldown should block dispatch until the user
+     clicks again after the cooldown expires.
+   - Decided 2026-05-25: do NOT ship marquee as a standalone V1.3. The alignment fix is
+     folded here because V2 reworks title rendering anyway.
 
 ### V3 — Packaging
 

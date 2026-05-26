@@ -4,7 +4,7 @@
 
 **Goal:** When LRCLIB returns no synced lyrics, fall back to NetEase Cloud Music (default on) to fill the gap — primarily for Chinese songs.
 
-**Architecture:** A new `src/netease.py` mirrors the LRCLIB fetcher shape (search → rank by name/artist/duration → fetch LRC → `parse_lrc`), using NetEase public endpoints with no cookie/auth. It takes primitive args (not `TrackInfo`) so it does not import from `lyrics_worker`, avoiding a circular import. `LyricsWorker` gains a `netease_fallback` flag and calls the fallback only when LRCLIB returns `None` (not on LRCLIB exceptions). All NetEase failures are caught inside the fetcher, logged, and surface as `None` so the main flow never breaks.
+**Architecture:** A new `src/netease.py` mirrors the LRCLIB fetcher shape (search → rank by name/artist/duration → fetch LRC → `parse_lrc`), using NetEase public endpoints with no cookie/auth. It takes primitive args (not `TrackInfo`) so it does not import from `lyrics_worker`, avoiding a circular import. `LyricsWorker` gains a `netease_fallback` flag and calls the fallback only when LRCLIB returns `None` (not on LRCLIB exceptions). NetEase confirmed misses return `None`; temporary failures raise `NeteaseUnavailableError`, are logged with the real reason, respect 429 `Retry-After`, and are not cached as "no lyrics".
 
 **Tech Stack:** Python 3, httpx, PyQt6, pytest + pytest-qt. No new dependencies.
 
@@ -17,12 +17,12 @@
 | File | Status | Responsibility |
 |------|--------|----------------|
 | `src/config.py` | Modify | Add `netease_fallback: True` to persisted defaults |
-| `src/netease.py` | Create | Search NetEase, rank candidates, fetch + parse LRC; catch-all → `None` |
-| `src/lyrics_worker.py` | Modify | `netease_fallback` flag; call fallback when LRCLIB returns `None` |
+| `src/netease.py` | Create | Search NetEase, rank candidates, fetch + parse LRC; confirmed miss → `None`; temporary unavailable/429 → `NeteaseUnavailableError` |
+| `src/lyrics_worker.py` | Modify | `netease_fallback` flag; call fallback when LRCLIB returns `None`; unavailable fallback emits temporary unavailable and does not cache |
 | `src/main.py` | Modify | Pass `config.netease_fallback` into `LyricsWorker` |
 | `tests/test_config.py` | Modify | Assert the new default |
-| `tests/test_netease.py` | Create | Ranking, parse, no-match, HTTP error, exception → `None` |
-| `tests/test_lyrics_worker.py` | Modify | Fallback called on LRCLIB miss when on; not called when off |
+| `tests/test_netease.py` | Create | Ranking, parse, no-match, HTTP error/429/exception → `NeteaseUnavailableError` |
+| `tests/test_lyrics_worker.py` | Modify | Fallback called on LRCLIB miss when on; not called when off; unavailable fallback not cached |
 
 **All commands run from the project root.** `pytest.ini` sets `pythonpath = .`, `testpaths = tests`.
 
@@ -75,7 +75,7 @@ git commit -m "feat: add netease_fallback config flag (default on) (V1.4)"
 
 ## Task 2: NetEase fetcher module
 
-**Why:** Isolates the unofficial NetEase calls and matching from the worker. Pure ranking/parsing is unit-tested; all network failures are swallowed into a `None` return so the fallback can never break the main flow. Takes primitive args (no `TrackInfo`) to avoid importing `lyrics_worker` (which imports this module).
+**Why:** Isolates the unofficial NetEase calls and matching from the worker. Pure ranking/parsing is unit-tested. A real miss returns `None`; temporary unavailable states raise `NeteaseUnavailableError` so the worker can avoid falsely caching "no lyrics". Takes primitive args (no `TrackInfo`) to avoid importing `lyrics_worker` (which imports this module).
 
 **Files:**
 - Create: `src/netease.py`
@@ -89,12 +89,19 @@ Create `tests/test_netease.py`:
 from unittest.mock import MagicMock, patch
 
 import httpx
+import pytest
 
 from src.netease import (
+    NeteaseUnavailableError,
     fetch_lyrics_from_netease,
     rank_netease_songs,
     search_netease,
 )
+
+
+@pytest.fixture(autouse=True)
+def reset_netease_cooldown(monkeypatch):
+    monkeypatch.setattr("src.netease._cooldown_until", 0.0, raising=False)
 
 
 def _song(song_id, name, artist, duration_ms):
@@ -138,9 +145,10 @@ class TestSearchNetease:
         assert songs[0]["id"] == 1
 
     @patch("src.netease.httpx.get")
-    def test_non_200_returns_empty(self, mock_get):
-        mock_get.return_value = MagicMock(status_code=403, json=lambda: {})
-        assert search_netease("Song", "Artist") == []
+    def test_non_200_raises_unavailable(self, mock_get):
+        mock_get.return_value = MagicMock(status_code=403, text="blocked", json=lambda: {})
+        with pytest.raises(NeteaseUnavailableError):
+            search_netease("Song", "Artist")
 
     @patch("src.netease.httpx.get")
     def test_missing_result_returns_empty(self, mock_get):
@@ -183,9 +191,26 @@ class TestFetchLyricsFromNetease:
         assert fetch_lyrics_from_netease("Song", "Artist", 180000) is None
 
     @patch("src.netease.httpx.get")
-    def test_network_error_returns_none(self, mock_get):
+    def test_network_error_raises_unavailable(self, mock_get):
         mock_get.side_effect = httpx.ConnectError("no internet")
-        assert fetch_lyrics_from_netease("Song", "Artist", 180000) is None
+        with pytest.raises(NeteaseUnavailableError):
+            fetch_lyrics_from_netease("Song", "Artist", 180000)
+
+    @patch("src.netease.httpx.get")
+    def test_429_sets_cooldown_and_next_call_skips_http(self, mock_get):
+        mock_get.return_value = MagicMock(
+            status_code=429,
+            headers={"Retry-After": "30"},
+            text="rate limited",
+            json=lambda: {},
+        )
+        with pytest.raises(NeteaseUnavailableError):
+            fetch_lyrics_from_netease("Song", "Artist", 180000)
+
+        mock_get.reset_mock()
+        with pytest.raises(NeteaseUnavailableError):
+            fetch_lyrics_from_netease("Song", "Artist", 180000)
+        mock_get.assert_not_called()
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -198,6 +223,7 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'src.netease'`.
 ```python
 import logging
 import re
+import time
 
 import httpx
 
@@ -206,10 +232,71 @@ from src.lrc_parser import parse_lrc
 NETEASE_SEARCH_URL = "https://music.163.com/api/search/get/web"
 NETEASE_LYRIC_URL = "https://music.163.com/api/song/lyric"
 DURATION_TOLERANCE_S = 5
+DEFAULT_RETRY_AFTER_S = 30
 _HEADERS = {
     "Referer": "https://music.163.com",
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
 }
+_cooldown_until = 0.0
+
+
+class NeteaseUnavailableError(RuntimeError):
+    """NetEase is temporarily unavailable; caller must not cache this as a miss."""
+
+
+def _cooldown_remaining() -> float:
+    return max(0.0, _cooldown_until - time.monotonic())
+
+
+def _set_cooldown(seconds: int) -> None:
+    global _cooldown_until
+    _cooldown_until = time.monotonic() + max(1, seconds)
+
+
+def _retry_after_seconds(response: httpx.Response) -> int:
+    value = response.headers.get("Retry-After")
+    if not value:
+        return DEFAULT_RETRY_AFTER_S
+    try:
+        return max(1, int(value))
+    except ValueError:
+        return DEFAULT_RETRY_AFTER_S
+
+
+def _request_json(url: str, params: dict) -> dict:
+    remaining = _cooldown_remaining()
+    if remaining > 0:
+        logging.warning("NetEase fallback unavailable: cooldown active for %.0fs", remaining)
+        raise NeteaseUnavailableError("NetEase cooldown active")
+
+    try:
+        response = httpx.get(url, params=params, headers=_HEADERS, timeout=5.0)
+    except httpx.RequestError as exc:
+        logging.warning("NetEase fallback unavailable: request error: %s", exc)
+        raise NeteaseUnavailableError("NetEase request failed") from exc
+
+    if response.status_code == 429:
+        retry_after = _retry_after_seconds(response)
+        _set_cooldown(retry_after)
+        logging.warning("NetEase fallback unavailable: 429, retry after %ss", retry_after)
+        raise NeteaseUnavailableError("NetEase rate limited")
+
+    if response.status_code != 200:
+        logging.warning(
+            "NetEase fallback unavailable: HTTP %s: %.120s",
+            response.status_code,
+            response.text,
+        )
+        raise NeteaseUnavailableError(f"NetEase HTTP {response.status_code}")
+
+    try:
+        return response.json() or {}
+    except ValueError as exc:
+        logging.warning(
+            "NetEase fallback unavailable: malformed JSON: %.120s",
+            response.text,
+        )
+        raise NeteaseUnavailableError("NetEase malformed JSON") from exc
 
 
 def _normalize(text: str) -> str:
@@ -256,57 +343,52 @@ def rank_netease_songs(
 
 
 def search_netease(track_name: str, artist_name: str) -> list[dict]:
-    response = httpx.get(
+    data = _request_json(
         NETEASE_SEARCH_URL,
         params={"s": f"{track_name} {artist_name}", "type": 1, "limit": 10},
-        headers=_HEADERS,
-        timeout=5.0,
     )
-    if response.status_code != 200:
-        return []
-    data = response.json() or {}
     return (data.get("result") or {}).get("songs") or []
 
 
 def fetch_netease_lyric(song_id) -> str | None:
-    response = httpx.get(
+    data = _request_json(
         NETEASE_LYRIC_URL,
         params={"id": song_id, "lv": -1, "kv": -1, "tv": -1},
-        headers=_HEADERS,
-        timeout=5.0,
     )
-    if response.status_code != 200:
-        return None
-    return ((response.json() or {}).get("lrc") or {}).get("lyric")
+    return ((data.get("lrc") or {}).get("lyric"))
 
 
 def fetch_lyrics_from_netease(
     track_name: str, artist_name: str, duration_ms: int
 ) -> list[tuple[int, str]] | None:
-    """Best-effort NetEase synced lyrics. Never raises; returns None on any failure."""
-    try:
-        songs = search_netease(track_name, artist_name)
-        best = rank_netease_songs(songs, track_name, artist_name, duration_ms // 1000)
-        if best is None:
-            logging.info("NetEase fallback: no match for %s - %s", track_name, artist_name)
-            return None
+    """Best-effort NetEase synced lyrics.
 
-        lyric_text = fetch_netease_lyric(best["id"])
-        if not lyric_text:
-            logging.info("NetEase fallback: no lyric for %s", best.get("name"))
-            return None
-
-        parsed = parse_lrc(lyric_text)
-        if not parsed:
-            logging.info("NetEase fallback: unparseable lyric for %s", best.get("name"))
-            return None
-
-        logging.info("NetEase fallback hit: %s (for %s)", best.get("name"), track_name)
-        return parsed
-    except Exception:
-        logging.exception("NetEase fallback request failed")
+    Returns None only for confirmed no-match/no-usable-lyric cases.
+    Raises NeteaseUnavailableError for temporary API/network/rate-limit failures.
+    """
+    songs = search_netease(track_name, artist_name)
+    best = rank_netease_songs(songs, track_name, artist_name, duration_ms // 1000)
+    if best is None:
+        logging.info("NetEase fallback miss: no match for %s - %s", track_name, artist_name)
         return None
+
+    lyric_text = fetch_netease_lyric(best["id"])
+    if not lyric_text:
+        logging.info("NetEase fallback miss: no lyric for %s", best.get("name"))
+        return None
+
+    parsed = parse_lrc(lyric_text)
+    if not parsed:
+        logging.info("NetEase fallback miss: unparseable timed lyric for %s", best.get("name"))
+        return None
+
+    logging.info("NetEase fallback hit: %s (for %s)", best.get("name"), track_name)
+    return parsed
 ```
+
+The `_cooldown_until` value is intentionally global to the NetEase fallback. A 429 from
+either search or lyric fetch means the public NetEase API is pushing back, so both endpoints
+skip while cooldown is active.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
@@ -317,7 +399,7 @@ Expected: all PASS. (If `test_end_to_end_hit` fails on the parsed tuples, confir
 
 ```bash
 git add src/netease.py tests/test_netease.py
-git commit -m "feat: add NetEase lyrics fetcher (search/rank/parse, fail-safe) (V1.4)"
+git commit -m "feat: add NetEase lyrics fetcher with rate-limit brake (V1.4)"
 ```
 
 ---
@@ -382,6 +464,27 @@ def test_netease_not_called_when_lrclib_hits(mock_lrclib, mock_netease, qtbot):
 
     mock_netease.assert_not_called()
     assert ready == [("t1", [(2000, "lrclib")])]
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease")
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_netease_unavailable_emits_unavailable_without_caching(
+    mock_lrclib, mock_netease, qtbot
+):
+    from src.netease import NeteaseUnavailableError
+
+    mock_netease.side_effect = NeteaseUnavailableError("rate limited")
+    worker = _pending_worker(netease_fallback=True)
+    unavailable = []
+    misses = []
+    worker.lyrics_unavailable.connect(lambda track_id: unavailable.append(track_id))
+    worker.no_lyrics.connect(lambda track_id: misses.append(track_id))
+
+    worker.run()
+
+    assert unavailable == ["t1"]
+    assert misses == []
+    assert worker._cache.get("t1") is worker._cache.MISS
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -394,7 +497,7 @@ Expected: FAIL — `LyricsWorker.__init__` takes no `netease_fallback`; `fetch_l
 Add the import after `from src.lrc_parser import parse_lrc`:
 
 ```python
-from src.netease import fetch_lyrics_from_netease
+from src.netease import NeteaseUnavailableError, fetch_lyrics_from_netease
 ```
 
 Change the constructor (lines 178-182) to accept and store the flag:
@@ -418,9 +521,13 @@ Replace the fetch/emit block inside `run` (lines 205-214) with:
                 return
 
             if not result and self._netease_fallback:
-                result = fetch_lyrics_from_netease(
-                    info.track_name, info.artist_name, info.duration_ms
-                )
+                try:
+                    result = fetch_lyrics_from_netease(
+                        info.track_name, info.artist_name, info.duration_ms
+                    )
+                except NeteaseUnavailableError:
+                    self.lyrics_unavailable.emit(info.track_id)
+                    return
 
             if result:
                 self._cache.set(info.track_id, result)
@@ -433,7 +540,7 @@ Replace the fetch/emit block inside `run` (lines 205-214) with:
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pytest tests/test_lyrics_worker.py -v`
-Expected: all PASS (existing LRCLIB/cache tests + the three new ones).
+Expected: all PASS (existing LRCLIB/cache tests + the new fallback tests).
 
 - [ ] **Step 5: Pass the flag from `main.py`**
 
@@ -461,6 +568,7 @@ Run `pythonw run.pyw` and play a Chinese song you know LRCLIB misses (previously
 2. Open the tray "Open log file" (or `%APPDATA%/spotify-lyrics-widget/widget.log`) and confirm a line like `NetEase fallback hit: <song> (for <track>)`.
 3. Set `"netease_fallback": false` in `%APPDATA%/spotify-lyrics-widget/config.json`, restart, replay the same song → it shows "no synced lyrics" again (fallback disabled).
 4. Play a song with lyrics on LRCLIB → still instant (NetEase not consulted; no extra log line).
+5. If NetEase returns 429 during testing, confirm the log records the retry window and later lookups skip NetEase until cooldown expires.
 
 - [ ] **Step 8: Commit**
 
@@ -477,9 +585,10 @@ git commit -m "feat: use NetEase fallback when LRCLIB misses (V1.4)"
 - NetEase source, search→rank→fetch→`parse_lrc`, no cookie → Task 2.
 - `netease_fallback` flag, default on → Task 1; consumed in Task 3 Step 5.
 - Trigger only on LRCLIB `None`, not on exceptions → Task 3 Step 3 (the `except` returns before the fallback; the fallback is in the no-exception path).
-- Fail-safe (catch all, log, return `None`, never break main flow) → Task 2 Step 3 `fetch_lyrics_from_netease` try/except + per-lookup INFO logs.
-- Reuse existing `LyricsCache` (hit cached like LRCLIB, both-miss → `NO_LYRICS`) → Task 3 Step 3 (unchanged cache calls).
-- Tests: ranking, parse, no-match, HTTP error, exception→None, worker on/off/lrclib-hit → Tasks 2 & 3.
+- Failure separation: confirmed miss → `None`; temporary unavailable/429 → `NeteaseUnavailableError`, logged with the real reason → Task 2 Step 3.
+- 429 brake: global NetEase fallback `Retry-After` cooldown, skip HTTP while cooldown is active → Task 2 tests and implementation.
+- Reuse existing `LyricsCache` (hit cached like LRCLIB, both-confirmed-miss → `NO_LYRICS`; temporary unavailable is not cached) → Task 3 Step 3.
+- Tests: ranking, parse, no-match, HTTP error/429/exception→`NeteaseUnavailableError`, worker on/off/lrclib-hit/unavailable-no-cache → Tasks 2 & 3.
 
 **Placeholder scan:** None — every step has complete code and exact commands.
 

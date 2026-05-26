@@ -4,11 +4,11 @@
 
 **Goal:** Add hover-revealed playback controls (play/pause, next, prev) and a hover title marquee with a left-aligned rest state — without reintroducing the content-jumping that V1.2 fixed.
 
-**Architecture:** Playback control HTTP calls run off the UI thread via `QThreadPool`/`QRunnable` (fire-and-forget, silent failure per spec). Adding the `user-modify-playback-state` scope forces a one-time re-auth, detected by comparing a stored `granted_scope` against the required scopes. Control buttons are absolutely-positioned overlay children inside the existing top-right gutter (`OVERLAY_GUTTER_WIDTH`, already reserved for the close button), so the title's available width never changes and nothing reflows. The title becomes a dedicated `MarqueeLabel` that left-aligns and elides at rest, and scrolls the full string (ping-pong) on hover only when it overflows.
+**Architecture:** Playback control HTTP calls run off the UI thread via `QThreadPool`/`QRunnable`. Non-2xx responses are logged with capped body snippets; 429 respects `Retry-After` and sets a short local cooldown so repeated clicks do not hammer Spotify. Duplicate clicks are dropped while a control request is already in flight. Adding the `user-modify-playback-state` scope forces a one-time re-auth, detected by comparing a stored `granted_scope` against the required scopes. The top row is split into fixed slots instead of a shared overlay/gutter: title around 5-50, controls around 60-80, close around 90-95. The 50-60 and 80-90 ranges are intentional buffer space. V1.3 already moved `offline` into the lyric lane, so V2's top row contains only title, controls, and close. The title becomes a dedicated `MarqueeLabel` that left-aligns and elides at rest, and scrolls the full string (ping-pong) on hover only when it overflows.
 
 **Tech Stack:** Python 3, PyQt6 (`QtCore`, `QtGui`, `QtWidgets`, `QtNetwork` already in use), httpx, pytest + pytest-qt. No new dependencies.
 
-**Prerequisite:** V1.3 is implemented (this plan assumes `app_font_family()` exists and the tray icon is present, but does not depend on them functionally).
+**Prerequisite:** V1.3 is implemented, including `app_font_family()` and the offline-in-lyric-lane correction. V2 assumes there is no `_offline_label` top-row overlay.
 
 ---
 
@@ -18,14 +18,14 @@
 |------|--------|----------------|
 | `src/auth.py` | Modify | Add `user-modify-playback-state` to `SCOPES`; add `has_required_scopes()` |
 | `src/config.py` | Modify | Add `granted_scope` to persisted defaults |
-| `src/playback.py` | Create | Pure control-request builder + `PlaybackController` dispatching on `QThreadPool` |
+| `src/playback.py` | Create | Pure control-request builder + `PlaybackController` dispatching on `QThreadPool`; log non-2xx; cap body snippets; drop in-flight duplicates; 429 cooldown |
 | `src/marquee.py` | Create | `MarqueeLabel`: left-aligned/elided at rest, ping-pong scroll on hover |
-| `src/widget.py` | Modify | Title → `MarqueeLabel`; add 3 overlay control buttons + hover show/hide + signals + `set_playing()` |
+| `src/widget.py` | Modify | Title → `MarqueeLabel`; fixed-slot top row; add 3 control buttons + hover show/hide + signals + `set_playing()` |
 | `src/main.py` | Modify | Build `PlaybackController`; wire control signals; track `is_playing`; scope-aware `_ensure_auth`; save `granted_scope` |
 | `tests/test_auth.py` | Modify | `has_required_scopes` cases |
-| `tests/test_playback.py` | Create | Request builder mapping + dispatch-to-pool |
+| `tests/test_playback.py` | Create | Request builder mapping, dispatch-to-pool, non-2xx logging, body snippet cap, in-flight duplicate drop, 429 cooldown |
 | `tests/test_marquee.py` | Create | Overflow detection, rest vs scroll, ping-pong reversal |
-| `tests/test_widget.py` | Modify | Control buttons hover visibility, signals, `set_playing`; update the elide test for `MarqueeLabel` |
+| `tests/test_widget.py` | Modify | Control buttons hover visibility, fixed-slot geometry/no overlap, signals, `set_playing`; update the elide test for `MarqueeLabel` |
 | `tests/test_main.py` | Modify | Scope-aware `_ensure_auth`; `granted_scope` saved; control wiring |
 
 **All commands run from the project root.** `pytest.ini` sets `pythonpath = .`, `testpaths = tests`.
@@ -220,7 +220,10 @@ git commit -m "feat: add playback scope with one-time re-auth on scope change (V
 Create `tests/test_playback.py`:
 
 ```python
-from src.playback import PlaybackController, build_control_request
+import time
+from unittest.mock import MagicMock, patch
+
+from src.playback import PlaybackController, _ControlTask, build_control_request
 
 
 def test_toggle_when_playing_pauses():
@@ -265,6 +268,69 @@ def test_controller_dispatches_to_pool(qtbot):
     controller.toggle(is_playing=True)
 
     assert len(pool.started) == 2
+
+
+@patch("src.playback.httpx.request")
+def test_control_task_logs_non_2xx(mock_request, caplog):
+    mock_request.return_value = MagicMock(status_code=403, text="missing scope")
+    task = _ControlTask("POST", "https://api.spotify.com/v1/me/player/next", "tok")
+
+    task.run()
+
+    assert "Playback control failed: HTTP 403" in caplog.text
+
+
+@patch("src.playback.httpx.request")
+def test_control_task_caps_logged_body_snippet(mock_request, caplog):
+    mock_request.return_value = MagicMock(status_code=500, text="x" * 200)
+    task = _ControlTask("POST", "https://api.spotify.com/v1/me/player/next", "tok")
+
+    task.run()
+
+    assert "x" * 120 in caplog.text
+    assert "x" * 121 not in caplog.text
+
+
+@patch("src.playback.httpx.request")
+def test_control_task_429_sets_cooldown(mock_request):
+    cooldowns = []
+    mock_request.return_value = MagicMock(
+        status_code=429, headers={"Retry-After": "17"}, text="rate limited"
+    )
+    task = _ControlTask(
+        "POST",
+        "https://api.spotify.com/v1/me/player/next",
+        "tok",
+        on_rate_limited=cooldowns.append,
+    )
+
+    task.run()
+
+    assert cooldowns == [17]
+
+
+def test_controller_skips_dispatch_while_rate_limited(qtbot, caplog):
+    config = type("C", (), {"access_token": "tok"})()
+    pool = _FakePool()
+    controller = PlaybackController(config, pool=pool)
+    controller._cooldown_until = time.monotonic() + 30
+
+    controller.next()
+
+    assert pool.started == []
+    assert "cooldown active" in caplog.text
+
+
+def test_controller_drops_duplicate_while_request_in_flight(qtbot, caplog):
+    config = type("C", (), {"access_token": "tok"})()
+    pool = _FakePool()
+    controller = PlaybackController(config, pool=pool)
+
+    controller.next()
+    controller.next()
+
+    assert len(pool.started) == 1
+    assert "request already in flight" in caplog.text
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
@@ -276,11 +342,13 @@ Expected: FAIL with `ModuleNotFoundError: No module named 'src.playback'`.
 
 ```python
 import logging
+import time
 
 import httpx
 from PyQt6.QtCore import QObject, QRunnable, QThreadPool
 
 _BASE = "https://api.spotify.com/v1/me/player"
+DEFAULT_RETRY_AFTER_S = 10
 
 
 def build_control_request(action: str, is_playing: bool) -> tuple[str, str]:
@@ -295,22 +363,59 @@ def build_control_request(action: str, is_playing: bool) -> tuple[str, str]:
 
 
 class _ControlTask(QRunnable):
-    def __init__(self, method: str, url: str, access_token: str):
+    def __init__(
+        self,
+        method: str,
+        url: str,
+        access_token: str,
+        on_rate_limited=None,
+        on_finished=None,
+    ):
         super().__init__()
         self._method = method
         self._url = url
         self._token = access_token
+        self._on_rate_limited = on_rate_limited
+        self._on_finished = on_finished
 
     def run(self):
         try:
-            httpx.request(
+            response = httpx.request(
                 self._method,
                 self._url,
                 headers={"Authorization": f"Bearer {self._token}"},
                 timeout=5.0,
             )
-        except Exception:
+        except httpx.RequestError:
             logging.exception("Playback control request failed")
+            return
+        finally:
+            if self._on_finished:
+                self._on_finished()
+
+        if response.status_code == 429:
+            retry_after = _retry_after_seconds(response)
+            logging.warning("Playback control rate limited: retry after %ss", retry_after)
+            if self._on_rate_limited:
+                self._on_rate_limited(retry_after)
+            return
+
+        if response.status_code >= 400:
+            logging.warning(
+                "Playback control failed: HTTP %s: %.120s",
+                response.status_code,
+                response.text,
+            )
+
+
+def _retry_after_seconds(response) -> int:
+    value = response.headers.get("Retry-After")
+    if not value:
+        return DEFAULT_RETRY_AFTER_S
+    try:
+        return max(1, int(value))
+    except ValueError:
+        return DEFAULT_RETRY_AFTER_S
 
 
 class PlaybackController(QObject):
@@ -320,10 +425,34 @@ class PlaybackController(QObject):
         super().__init__()
         self._config = config
         self._pool = pool or QThreadPool.globalInstance()
+        self._cooldown_until = 0.0
+        self._in_flight = False
+
+    def _set_cooldown(self, seconds: int):
+        self._cooldown_until = time.monotonic() + max(1, seconds)
+
+    def _mark_finished(self):
+        self._in_flight = False
 
     def _dispatch(self, action: str, is_playing: bool = False):
+        remaining = self._cooldown_until - time.monotonic()
+        if remaining > 0:
+            logging.warning("Playback control skipped: cooldown active for %.0fs", remaining)
+            return
+        if self._in_flight:
+            logging.info("Playback control skipped: request already in flight")
+            return
         method, url = build_control_request(action, is_playing)
-        self._pool.start(_ControlTask(method, url, self._config.access_token))
+        self._in_flight = True
+        self._pool.start(
+            _ControlTask(
+                method,
+                url,
+                self._config.access_token,
+                on_rate_limited=self._set_cooldown,
+                on_finished=self._mark_finished,
+            )
+        )
 
     def toggle(self, is_playing: bool):
         self._dispatch("toggle", is_playing)
@@ -338,20 +467,20 @@ class PlaybackController(QObject):
 - [ ] **Step 4: Run the test to verify it passes**
 
 Run: `pytest tests/test_playback.py -v`
-Expected: PASS (4 passed).
+Expected: PASS (request mapping, dispatch, non-2xx logging, body snippet cap, in-flight duplicate drop, and 429 cooldown tests pass).
 
 - [ ] **Step 5: Commit**
 
 ```bash
 git add src/playback.py tests/test_playback.py
-git commit -m "feat: add off-thread playback control HTTP layer (V2)"
+git commit -m "feat: add playback controls with API failure logging (V2)"
 ```
 
 ---
 
-## Task 3: Hover playback control buttons in the widget
+## Task 3: Hover playback control buttons in fixed top-row slots
 
-**Why:** Three flat icon buttons (prev / play-pause / next) overlay the existing top-right gutter and appear on hover alongside the close button — no layout row is added, so the title width is unchanged and nothing reflows (honours V1.2's fixed-geometry rule). The play/pause glyph reflects current state.
+**Why:** Three flat icon buttons (prev / play-pause / next) appear on hover inside a fixed controls slot. They do not share a gutter with the title or close button, and V1.3 has already moved `offline` into the lyric lane. No layout row is added, so the title width is unchanged and nothing reflows (honours V1.2's fixed-geometry rule). The play/pause glyph reflects current state.
 
 **Files:**
 - Modify: `src/widget.py` (buttons, positioning, hover, signals, `set_playing`)
@@ -403,11 +532,30 @@ def test_set_playing_swaps_play_pause_glyph(qtbot):
     playing_glyph = widget._play_pause_btn.text()
     widget.set_playing(False)
     assert widget._play_pause_btn.text() != playing_glyph
+
+
+def test_top_row_slots_do_not_overlap(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.wait(50)
+    widget._position_top_row_slots()
+
+    title = widget._track_label.geometry()
+    prev = widget._prev_btn.geometry()
+    play = widget._play_pause_btn.geometry()
+    next_btn = widget._next_btn.geometry()
+    close = widget._close_btn.geometry()
+
+    assert title.right() < prev.left()
+    assert prev.right() < play.left()
+    assert play.right() < next_btn.left()
+    assert next_btn.right() < close.left()
 ```
 
 - [ ] **Step 2: Run the test to verify it fails**
 
-Run: `pytest tests/test_widget.py -k "control_buttons or set_playing" -v`
+Run: `pytest tests/test_widget.py -k "control_buttons or set_playing or top_row_slots" -v`
 Expected: FAIL — `_prev_btn` etc. do not exist.
 
 - [ ] **Step 3: Add the control buttons in `src/widget.py`**
@@ -420,7 +568,11 @@ Add signals to the class (next to `close_requested = pyqtSignal()` at line 34):
     play_pause_clicked = pyqtSignal()
 ```
 
-In `_setup_ui`, after the `_close_btn` block (after line 100, before `layout.addWidget(self._top_row)`), create the three control buttons as children of `self._panel`:
+Change the existing close button creation from `QPushButton("✕", self._panel)` to
+`QPushButton("✕", self._top_row)` so its geometry is measured in the same coordinate system
+as the title and controls.
+
+In `_setup_ui`, after the `_close_btn` block (after line 100, before `layout.addWidget(self._top_row)`), create the three control buttons as children of `self._top_row`:
 
 ```python
         self._prev_btn = self._make_control_button("⏮")
@@ -433,12 +585,32 @@ In `_setup_ui`, after the `_close_btn` block (after line 100, before `layout.add
             button.setVisible(False)
 ```
 
-Add a helper method to the class (near `_position_overlay_controls`):
+Add fixed-slot constants near the widget constants. These are content-row positions inside
+`_top_row` (the row width is `WIDGET_WIDTH - 32` because the panel keeps 16px left/right
+content margins):
+
+```python
+TITLE_SLOT_X = 0
+TITLE_SLOT_WIDTH = 224
+CONTROL_SLOT_X = 252
+CONTROL_BUTTON_SIZE = 20
+CONTROL_BUTTON_GAP = 4
+CLOSE_BUTTON_X = 368
+```
+
+The empty ranges between title/control/close slots are intentional buffer space. Do not fill
+them with layout stretch or another overlay.
+
+In `_setup_ui`, stop using `QHBoxLayout` for `_top_row`. Keep `_top_row` as a fixed-height
+`QWidget`, add it to the panel layout, and position its child widgets with
+`_position_top_row_slots()`.
+
+Add a helper method to the class (near `_position_top_row_slots`):
 
 ```python
     def _make_control_button(self, glyph: str) -> QPushButton:
-        button = QPushButton(glyph, self._panel)
-        button.setFixedSize(20, 20)
+        button = QPushButton(glyph, self._top_row)
+        button.setFixedSize(CONTROL_BUTTON_SIZE, CONTROL_BUTTON_SIZE)
         button.setStyleSheet(
             f"QPushButton {{ color: {WHITE}; background: transparent; border: none; font-size: 12px; }}"
             f"QPushButton:hover {{ color: {SPOTIFY_GREEN}; }}"
@@ -446,21 +618,31 @@ Add a helper method to the class (near `_position_overlay_controls`):
         return button
 ```
 
-Position the buttons inside the gutter, left of the close button, in `_position_overlay_controls`. Replace that method (lines 201-207) with:
+Move the close button to the same parent (`self._top_row`) as the title and controls, then
+position all top-row children through fixed slots. Replace `_position_overlay_controls`
+with `_position_top_row_slots`:
 
 ```python
-    def _position_overlay_controls(self):
-        panel_width = max(self._panel.width(), self.width())
+    def _position_top_row_slots(self):
+        if hasattr(self, "_track_label"):
+            self._track_label.setGeometry(
+                TITLE_SLOT_X, 0, TITLE_SLOT_WIDTH, TOP_ROW_HEIGHT
+            )
         if hasattr(self, "_close_btn"):
-            self._close_btn.move(panel_width - 30, 8)
-        if hasattr(self, "_offline_label"):
-            self._offline_label.move(panel_width - OVERLAY_GUTTER_WIDTH, 9)
+            self._close_btn.move(CLOSE_BUTTON_X, 0)
         if hasattr(self, "_next_btn"):
-            # Row of three controls just left of the close button, within the gutter.
-            self._next_btn.move(panel_width - 54, 8)
-            self._play_pause_btn.move(panel_width - 76, 8)
-            self._prev_btn.move(panel_width - 98, 8)
+            self._prev_btn.move(CONTROL_SLOT_X, 0)
+            self._play_pause_btn.move(
+                CONTROL_SLOT_X + CONTROL_BUTTON_SIZE + CONTROL_BUTTON_GAP, 0
+            )
+            self._next_btn.move(
+                CONTROL_SLOT_X + (CONTROL_BUTTON_SIZE + CONTROL_BUTTON_GAP) * 2,
+                0,
+            )
 ```
+
+Update all call sites from `_position_overlay_controls()` to `_position_top_row_slots()`.
+Do not reference `_offline_label` here; V1.3 removed it.
 
 Update hover handlers (lines 250-254) to toggle the control buttons too:
 
@@ -487,7 +669,7 @@ Add `set_playing` (near the other public setters):
 
 - [ ] **Step 4: Run the test to verify it passes**
 
-Run: `pytest tests/test_widget.py -k "control_buttons or set_playing" -v`
+Run: `pytest tests/test_widget.py -k "control_buttons or set_playing or top_row_slots" -v`
 Expected: PASS.
 
 - [ ] **Step 5: Write the failing test for control wiring in `tests/test_main.py`**
@@ -571,7 +753,7 @@ git commit -m "feat: add hover playback control buttons wired to controller (V2)
 
 ## Task 4: Title left-align + hover marquee
 
-**Why:** The title is currently `AlignCenter` but sits lopsided because only a right gutter is reserved. Left-aligning fixes that and is the natural rest state for a marquee. A dedicated `MarqueeLabel` keeps fixed geometry and clipped painting: elided + left-aligned at rest, slow ping-pong of the full string on hover, and only when the title overflows. It scrolls the rendered string offset (never substring-slices), so CJK/Unicode stays correct.
+**Why:** The title should live in a fixed left slot, not be centered against a window that also contains controls and close buttons. Left-aligning is the natural rest state for a marquee. A dedicated `MarqueeLabel` keeps fixed geometry and clipped painting: elided + left-aligned at rest, slow ping-pong of the full string on hover, and only when the title overflows. It scrolls the rendered string offset (never substring-slices), so CJK/Unicode stays correct.
 
 **Files:**
 - Create: `src/marquee.py`
@@ -751,9 +933,11 @@ Replace the `_track_label` construction (lines 86-90) with:
         self._track_label = MarqueeLabel(self._top_row)
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
         self._track_label.set_color(WHITE)
-        top_row.addWidget(self._track_label, stretch=1)
-        top_row.addSpacing(OVERLAY_GUTTER_WIDTH)
+        self._position_top_row_slots()
 ```
+
+Do not add `top_row.addSpacing(OVERLAY_GUTTER_WIDTH)`. V2 does not use the old right gutter;
+the title width comes from `TITLE_SLOT_WIDTH`.
 
 Simplify `update_track_info` (lines 141-143) — the marquee handles eliding, so just set the text:
 
@@ -822,10 +1006,11 @@ Expected: all PASS.
 
 Run `pythonw run.pyw`. Verify:
 1. **One-time re-auth:** on first launch after upgrading, the browser opens for re-authorization (because the stored scope lacks `user-modify-playback-state`). After approving, it does not prompt again on subsequent launches.
-2. **Controls (Spotify Premium required):** hover the widget — ⏮ ▶/⏸ ⏭ appear in the top-right next to ✕, and the lyric line stays fully visible (no downward shift). Click play/pause — Spotify toggles and the glyph updates within ~1s. Next/prev change tracks. Leave hover — controls disappear.
-3. **Title at rest:** the title is left-aligned (not centered), and a long title shows `...` at the right.
-4. **Marquee:** hover a track whose title is long enough to overflow — the title scrolls (slow ping-pong) and stops/resets on leave and on track change. A short title does not scroll.
-5. **No jumping:** widget height/width never change across hover, track change, or play/pause.
+2. **Controls (Spotify Premium required):** hover the widget — previous / play-pause / next appear inside the fixed controls slot, with the close button in its own far-right slot, and the lyric line stays fully visible (no downward shift). Click play/pause — Spotify toggles and the glyph updates within ~1s. Next/prev change tracks. Leave hover — controls disappear.
+3. **Click brake:** rapidly double-click a control. Confirm only one request is dispatched while the first is in flight. If Spotify returns 429, confirm clicks during cooldown are skipped and a later user click after cooldown dispatches normally; there is no automatic queued retry. This rule is only for playback-control clicks, not lyrics lookup retry behaviour.
+4. **Title at rest:** the title is left-aligned (not centered), and a long title shows `...` at the right.
+5. **Marquee:** hover a track whose title is long enough to overflow — the title scrolls (slow ping-pong) and stops/resets on leave and on track change. A short title does not scroll.
+6. **No jumping:** widget height/width never change across hover, track change, or play/pause.
 
 - [ ] **Step 10: Commit**
 
@@ -839,7 +1024,7 @@ git commit -m "feat: left-align title + hover ping-pong marquee (V2)"
 ## Self-Review
 
 **Spec coverage** (against updated `2026-05-22-...-design.md` → "V2 — Playback Controls & Title Marquee"):
-- Hover control row (play/pause, next, prev) → Task 3 (overlay in gutter, no reflow per the layout decision) + Task 2 (HTTP).
+- Hover control row (play/pause, next, prev) → Task 3 (fixed controls slot with intentional buffer gaps, no reflow) + Task 2 (HTTP + non-2xx/429 handling, capped body snippets, in-flight duplicate drop).
 - OAuth scope `user-modify-playback-state` only → Task 1 (playlist scopes explicitly not added).
 - Title left-align at rest → Task 4 Step 5.
 - Hover marquee, full-string scroll, overflow-only, CJK-safe → Task 4 (`MarqueeLabel`, offset-based, never substring-slices).
@@ -861,4 +1046,4 @@ git commit -m "feat: left-align title + hover ping-pong marquee (V2)"
 
 **2. Inline Execution** — execute in this session with checkpoints.
 
-**Which approach?** (Note: not for now — V1.3 should ship first, and the V1.4 spec still needs your input.)
+**Which approach?** (Note: not for now — suggested order is V1.3 → V1.4 → V2.)
