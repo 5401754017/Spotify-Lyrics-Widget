@@ -1,3 +1,6 @@
+import ctypes
+import logging
+import sys
 import time
 
 from PyQt6.QtCore import QPoint, QRectF, Qt, QTimer, pyqtSignal
@@ -36,6 +39,10 @@ LYRIC_LANE_HEIGHT = 60
 OVERLAY_GUTTER_WIDTH = 92
 CORNER_RADIUS = 12
 
+# Windows 11 DWM rounded-corner experiment (DwmSetWindowAttribute)
+_DWMWA_WINDOW_CORNER_PREFERENCE = 33
+_DWMWCP_ROUND = 2
+
 
 class LyricsWidget(QWidget):
     """Frameless always-on-top floating lyrics widget."""
@@ -64,17 +71,30 @@ class LyricsWidget(QWidget):
             | Qt.WindowType.Tool
         )
         self.setFixedSize(WIDGET_WIDTH, WIDGET_HEIGHT)
-        self._apply_window_mask()
+        # Opaque window background; corners are rounded by the DWM (see showEvent)
+        # instead of a jagged 1-bit QRegion mask.
+        self.setStyleSheet(f"LyricsWidget {{ background-color: {PANEL_BACKGROUND}; }}")
         self.setMouseTracking(True)
 
-    def _apply_window_mask(self):
-        path = QPainterPath()
-        path.addRoundedRect(
-            QRectF(0, 0, self.width(), self.height()),
-            CORNER_RADIUS,
-            CORNER_RADIUS,
-        )
-        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+    def _apply_dwm_rounding(self):
+        """Ask the Windows 11 DWM to round the window corners (anti-aliased).
+
+        Experiment replacing the jagged QRegion mask. If the frameless window
+        does not honor it, corners stay square — that is the failure signal.
+        """
+        if sys.platform != "win32":
+            return
+        try:
+            value = ctypes.c_int(_DWMWCP_ROUND)
+            hresult = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                int(self.winId()),
+                _DWMWA_WINDOW_CORNER_PREFERENCE,
+                ctypes.byref(value),
+                ctypes.sizeof(value),
+            )
+            logging.info("DWM round-corner request hr=0x%08x", hresult & 0xFFFFFFFF)
+        except Exception as exc:
+            logging.warning("DWM round-corner request failed: %s", exc)
 
     def _setup_ui(self):
         outer_layout = QVBoxLayout()
@@ -275,12 +295,12 @@ class LyricsWidget(QWidget):
         super().leaveEvent(event)
 
     def showEvent(self, event):
+        self._apply_dwm_rounding()
         self._position_overlay_controls()
         self._refresh_track_label_text()
         super().showEvent(event)
 
     def resizeEvent(self, event):
-        self._apply_window_mask()
         self._position_overlay_controls()
         self._refresh_track_label_text()
         super().resizeEvent(event)
