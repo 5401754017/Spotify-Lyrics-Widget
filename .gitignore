@@ -6,3 +6,4 @@ build/
 *.spec
 .env
 .worktrees/
+spotify-widget-v1-smoke.png
