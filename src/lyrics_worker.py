@@ -123,7 +123,7 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
                 "album_name": info.album_name,
                 "duration": duration_s,
             },
-            timeout=5.0,
+            timeout=10.0,
         )
     except httpx.TimeoutException as error:
         raise LrclibUnavailableError(f"lrclib timeout: {error}") from error
@@ -143,7 +143,7 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
                 "track_name": info.track_name,
                 "artist_name": info.artist_name,
             },
-            timeout=5.0,
+            timeout=10.0,
         )
     except httpx.TimeoutException as error:
         raise LrclibUnavailableError(f"lrclib search timeout: {error}") from error
