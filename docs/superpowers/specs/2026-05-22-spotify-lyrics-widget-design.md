@@ -81,7 +81,7 @@ up to two lines, always-on-top, with hover-to-reveal playback controls.
 | `spotify_worker` | V1 | Poll currently playing track every 1s in a worker thread. Emit state-change, playback, network, and rate-limit signals. |
 | `lyrics_worker` | V1 | Query lrclib.net in a worker thread, cache results by Spotify track ID for the session, and emit lyrics/no-lyrics/unavailable signals. |
 | `lrc_parser` | V1 | Parse LRC timestamps into sorted `(timestamp_ms, line_text)` tuples and find the current line. |
-| `widget` | V1-V1.3 | PyQt6 frameless always-on-top draggable window, rounded mask, rounded panel, lyric display, progress bar, offline status in lyric lane. V2: hover playback controls + title marquee. |
+| `widget` | V1-V1.3 | PyQt6 frameless always-on-top draggable opaque window with Windows 11 DWM rounded corners + DWM green border, lyric display, progress bar, offline status in lyric lane. V2: hover playback controls + title marquee. |
 | `logging_setup` | V1.2-V1.3 | Configure `%APPDATA%/spotify-lyrics-widget/widget.log`, rotating file handler, and uncaught-exception logging for `pythonw`. |
 | `fonts` | V1.3 | Detect system CJK font (`Microsoft JhengHei UI` → `Microsoft JhengHei` → `Segoe UI`) and expose `app_font_family()`. |
 | `tray` | V1.3 | System tray icon, raise/show-hide/open-log/quit menu actions. |
@@ -114,7 +114,7 @@ PyQt6 Signals/Slots:
 - `spotify_worker.track_changed(PlayerState)` → `App._on_track_changed()` updates
   `LyricsWidget`, clears the lyric lane, and calls `LyricsWorker.request_lyrics(TrackInfo)`.
   (The old forced `repaint()`/`force_visual_refresh()` workaround was removed in `4589a84`;
-  the opaque masked window repaints correctly through normal Qt paths.)
+  the opaque window repaints correctly through normal Qt paths.)
 - `spotify_worker.state_synced(progress_ms, is_playing, timestamp)` →
   `LyricsWidget.resync_local_timer()`.
 - `spotify_worker.playback_toggled(is_playing)` → stop/resume local UI timer handling.
@@ -156,10 +156,15 @@ V1/V1.2: hover shows the close button only. V1.3 moves network offline status in
 
 ### Visual Style
 
-- **Window surface:** Frameless opaque top-level window clipped by a rounded `QRegion` mask.
-  The inner `#121212` panel keeps the same rounded Spotify-green border. V1.3 no longer uses
-  `WA_TranslucentBackground` because that Windows layered-window path caused stale visual
-  buffers during live track changes.
+- **Window surface:** Frameless **opaque** top-level window. Rounded corners and the
+  Spotify-green border are both drawn by the **Windows 11 DWM** (`DwmSetWindowAttribute`:
+  `DWMWCP_ROUND` + `DWMWA_BORDER_COLOR`); the inner `#121212` panel draws no border/radius of
+  its own. `WA_TranslucentBackground` is intentionally NOT used — that layered-window path
+  caused stale visual buffers during live track changes. An interim `QRegion` mask fixed the
+  staleness but gave jagged (non-anti-aliased) corners; the DWM path is both smooth and stable
+  (opaque window, no dependency on continuous repaint). The DWM corner/border attributes are
+  Windows 11 APIs; on older Windows the call is a guarded no-op and the window falls back to
+  square and borderless.
 - **Song name / artist:** White `#FFFFFF`
 - **Lyrics text:** Spotify green `#1DB954`
 - **Control icons:** White `#FFFFFF`
@@ -175,7 +180,7 @@ V1/V1.2: hover shows the close button only. V1.3 moves network offline status in
 
 - Frameless (`Qt.FramelessWindowHint`)
 - Always on top (`Qt.WindowStaysOnTopHint`)
-- Rounded top-level mask (`QPainterPath` → `QRegion`) instead of transparent layered corners
+- Rounded corners + green border via Windows 11 DWM (`DwmSetWindowAttribute`: `DWMWCP_ROUND` + `DWMWA_BORDER_COLOR`), not a transparent layered window or a `QRegion` mask
 - Draggable by clicking and holding anywhere on the window
 - Position saved to config on close, restored on launch
 - System tray icon (added V1.3): running-status indicator, left-click raises the widget to
