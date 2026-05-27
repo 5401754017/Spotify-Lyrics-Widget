@@ -78,3 +78,13 @@ class TestFindCurrentLine:
     def test_exact_match_last(self):
         lines = [(5000, "First"), (10000, "Second")]
         assert find_current_line(lines, 10000) == 1
+
+
+def test_single_timestamp_unchanged():
+    from src.lrc_parser import parse_lrc
+    assert parse_lrc("[00:05.00]hello") == [(5000, "hello")]
+
+
+def test_multi_timestamp_line_expands_and_sorts():
+    from src.lrc_parser import parse_lrc
+    assert parse_lrc("[00:20.00][00:05.00]chorus") == [(5000, "chorus"), (20000, "chorus")]
