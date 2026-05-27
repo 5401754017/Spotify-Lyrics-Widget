@@ -6,6 +6,7 @@ import httpx
 from PyQt6.QtCore import QThread, pyqtSignal
 
 from src.lrc_parser import parse_lrc
+from src.netease import NeteaseUnavailableError, fetch_lyrics_from_netease
 
 
 LRCLIB_BASE = "https://lrclib.net/api"
@@ -179,11 +180,12 @@ class LyricsWorker(QThread):
     no_lyrics = pyqtSignal(str)
     lyrics_unavailable = pyqtSignal(str)
 
-    def __init__(self):
+    def __init__(self, netease_fallback: bool = True):
         super().__init__()
         self._cache = LyricsCache()
         self._pending_track: TrackInfo | None = None
         self._has_work = False
+        self._netease_fallback = netease_fallback
 
     def request_lyrics(self, track_info: TrackInfo):
         self._pending_track = track_info
@@ -208,11 +210,22 @@ class LyricsWorker(QThread):
 
             try:
                 result = fetch_lyrics_from_lrclib(info)
-                if result:
-                    self._cache.set(info.track_id, result)
-                    self.lyrics_ready.emit(info.track_id, result)
-                else:
-                    self._cache.set_no_lyrics(info.track_id)
-                    self.no_lyrics.emit(info.track_id)
             except (httpx.ConnectError, LrclibUnavailableError):
                 self.lyrics_unavailable.emit(info.track_id)
+                return
+
+            if not result and self._netease_fallback:
+                try:
+                    result = fetch_lyrics_from_netease(
+                        info.track_name, info.artist_name, info.duration_ms
+                    )
+                except NeteaseUnavailableError:
+                    self.lyrics_unavailable.emit(info.track_id)
+                    return
+
+            if result:
+                self._cache.set(info.track_id, result)
+                self.lyrics_ready.emit(info.track_id, result)
+            else:
+                self._cache.set_no_lyrics(info.track_id)
+                self.no_lyrics.emit(info.track_id)

@@ -91,7 +91,7 @@ class App(QObject):
         self._config = Config()
         self._widget = LyricsWidget()
         self._spotify_worker = SpotifyWorker(self._config)
-        self._lyrics_worker = LyricsWorker()
+        self._lyrics_worker = LyricsWorker(netease_fallback=self._config.netease_fallback)
         self._current_track_id: str | None = None
         self._tray: TrayIcon | None = None
         self._last_heartbeat_ts: float = 0.0

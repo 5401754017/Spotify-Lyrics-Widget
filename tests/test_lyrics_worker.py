@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 import httpx
 import pytest
 
-from src.lyrics_worker import LyricsCache, TrackInfo, fetch_lyrics_from_lrclib, rank_search_results
+from src.lyrics_worker import LrclibUnavailableError, LyricsCache, TrackInfo, fetch_lyrics_from_lrclib, rank_search_results
 
 
 class TestFetchLyrics:
@@ -314,3 +314,67 @@ def test_lrclib_malformed_json_is_unavailable_not_crash():
     with patch("src.lyrics_worker.httpx.get", return_value=bad):
         with pytest.raises(LrclibUnavailableError):
             fetch_lyrics_from_lrclib(info)
+
+
+def _pending_worker(netease_fallback):
+    from src.lyrics_worker import LyricsWorker
+    worker = LyricsWorker(netease_fallback=netease_fallback)
+    worker._pending_track = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+    worker._has_work = True
+    return worker
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease", return_value=[(1000, "ne")])
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_falls_back_to_netease_when_lrclib_misses(mock_lrclib, mock_netease, qtbot):
+    worker = _pending_worker(netease_fallback=True)
+    ready = []
+    worker.lyrics_ready.connect(lambda tid, lyr: ready.append((tid, lyr)))
+    worker.run()
+    mock_netease.assert_called_once_with("Song", "Artist", 180000)
+    assert ready == [("t1", [(1000, "ne")])]
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease")
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_netease_not_called_when_disabled(mock_lrclib, mock_netease, qtbot):
+    worker = _pending_worker(netease_fallback=False)
+    misses = []
+    worker.no_lyrics.connect(lambda tid: misses.append(tid))
+    worker.run()
+    mock_netease.assert_not_called()
+    assert misses == ["t1"]
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease")
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", side_effect=LrclibUnavailableError("rl"))
+def test_lrclib_unavailable_does_not_call_netease(mock_lrclib, mock_netease, qtbot):
+    worker = _pending_worker(netease_fallback=True)
+    unavailable = []
+    worker.lyrics_unavailable.connect(lambda tid: unavailable.append(tid))
+    worker.run()
+    mock_netease.assert_not_called()
+    assert unavailable == ["t1"]
+    assert worker._cache.get("t1") is worker._cache.MISS
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease")
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_netease_unavailable_emits_unavailable_without_caching(mock_lrclib, mock_netease, qtbot):
+    from src.netease import NeteaseUnavailableError
+    mock_netease.side_effect = NeteaseUnavailableError("rl")
+    worker = _pending_worker(netease_fallback=True)
+    unavailable, misses = [], []
+    worker.lyrics_unavailable.connect(lambda tid: unavailable.append(tid))
+    worker.no_lyrics.connect(lambda tid: misses.append(tid))
+    worker.run()
+    assert unavailable == ["t1"] and misses == []
+    assert worker._cache.get("t1") is worker._cache.MISS
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease", return_value=None)
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_both_miss_caches_no_lyrics(mock_lrclib, mock_netease, qtbot):
+    worker = _pending_worker(netease_fallback=True)
+    worker.run()
+    assert worker._cache.get("t1") is worker._cache.NO_LYRICS
