@@ -63,3 +63,8 @@ def test_config_loads_utf8_bom_file(tmp_path):
 def test_default_appdata_path():
     config = Config()
     assert "spotify-lyrics-widget" in str(config._config_dir)
+
+
+def test_netease_fallback_defaults_to_true(tmp_path):
+    from src.config import Config
+    assert Config(config_dir=tmp_path).netease_fallback is True
