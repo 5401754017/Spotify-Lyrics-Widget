@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import httpx
+import pytest
 
 from src.lyrics_worker import LyricsCache, TrackInfo, fetch_lyrics_from_lrclib, rank_search_results
 
@@ -292,3 +293,24 @@ class TestLyricsCache:
     def test_cache_does_not_store_transient_failure(self):
         cache = LyricsCache()
         assert cache.get("t3") is cache.MISS
+
+
+def test_lrclib_429_is_unavailable_not_miss():
+    from src.lyrics_worker import LrclibUnavailableError, fetch_lyrics_from_lrclib, TrackInfo
+
+    info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+    with patch("src.lyrics_worker.httpx.get") as mock_get:
+        mock_get.return_value = MagicMock(status_code=429, headers={"Retry-After": "30"}, text="rl")
+        with pytest.raises(LrclibUnavailableError):
+            fetch_lyrics_from_lrclib(info)
+
+
+def test_lrclib_malformed_json_is_unavailable_not_crash():
+    from src.lyrics_worker import LrclibUnavailableError, fetch_lyrics_from_lrclib, TrackInfo
+
+    info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+    bad = MagicMock(status_code=200, text="<html>")
+    bad.json.side_effect = ValueError("no json")
+    with patch("src.lyrics_worker.httpx.get", return_value=bad):
+        with pytest.raises(LrclibUnavailableError):
+            fetch_lyrics_from_lrclib(info)

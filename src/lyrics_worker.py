@@ -16,6 +16,19 @@ class LrclibUnavailableError(Exception):
     """Raised when LRCLIB has a transient server or timeout failure."""
 
 
+def _lrclib_json_or_unavailable(response):
+    if response.status_code == 429:
+        raise LrclibUnavailableError(f"lrclib rate limited: {response.status_code}")
+    if response.status_code >= 500:
+        raise LrclibUnavailableError(f"lrclib server error: {response.status_code}")
+    if response.status_code != 200:
+        return None  # e.g. /get 404 -> caller falls through to /search
+    try:
+        return response.json()
+    except ValueError as error:
+        raise LrclibUnavailableError(f"lrclib malformed JSON: {error}") from error
+
+
 @dataclass
 class TrackInfo:
     track_id: str
@@ -128,11 +141,9 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
     except httpx.TimeoutException as error:
         raise LrclibUnavailableError(f"lrclib timeout: {error}") from error
 
-    if response.status_code >= 500:
-        raise LrclibUnavailableError(f"lrclib server error: {response.status_code}")
-
-    if response.status_code == 200:
-        synced_lyrics = response.json().get("syncedLyrics")
+    data = _lrclib_json_or_unavailable(response)
+    if data:
+        synced_lyrics = data.get("syncedLyrics")
         if synced_lyrics:
             return parse_lrc(synced_lyrics)
 
@@ -148,23 +159,16 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
     except httpx.TimeoutException as error:
         raise LrclibUnavailableError(f"lrclib search timeout: {error}") from error
 
-    if response.status_code >= 500:
-        raise LrclibUnavailableError(
-            f"lrclib search server error: {response.status_code}"
+    data = _lrclib_json_or_unavailable(response)
+    if isinstance(data, list) and data:
+        best = rank_search_results(
+            data,
+            target_duration_s=duration_s,
+            target_track=info.track_name,
+            target_artist=info.artist_name,
         )
-
-    if response.status_code == 200:
-        results = response.json()
-        if isinstance(results, list) and results:
-            best = rank_search_results(
-                results,
-                target_duration_s=duration_s,
-                target_track=info.track_name,
-                target_artist=info.artist_name,
-            )
-            if best and best.get("syncedLyrics"):
-                return parse_lrc(best["syncedLyrics"])
-
+        if best and best.get("syncedLyrics"):
+            return parse_lrc(best["syncedLyrics"])
     return None
 
 
