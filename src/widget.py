@@ -40,6 +40,9 @@ CORNER_RADIUS = 12
 # Windows 11 DWM rounded-corner experiment (DwmSetWindowAttribute)
 _DWMWA_WINDOW_CORNER_PREFERENCE = 33
 _DWMWCP_ROUND = 2
+_DWMWA_BORDER_COLOR = 34
+# Spotify green (#1DB954) as a Win32 COLORREF (0x00BBGGRR)
+_DWM_BORDER_COLOR = 0x0054B91D
 
 
 class LyricsWidget(QWidget):
@@ -83,16 +86,30 @@ class LyricsWidget(QWidget):
         if sys.platform != "win32":
             return
         try:
-            value = ctypes.c_int(_DWMWCP_ROUND)
-            hresult = ctypes.windll.dwmapi.DwmSetWindowAttribute(
-                int(self.winId()),
+            hwnd = int(self.winId())
+            corner = ctypes.c_int(_DWMWCP_ROUND)
+            hr1 = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
                 _DWMWA_WINDOW_CORNER_PREFERENCE,
-                ctypes.byref(value),
-                ctypes.sizeof(value),
+                ctypes.byref(corner),
+                ctypes.sizeof(corner),
             )
-            logging.info("DWM round-corner request hr=0x%08x", hresult & 0xFFFFFFFF)
+            # The single green frame is the DWM system border; the panel draws
+            # no border of its own, so this hugs the rounded corner exactly.
+            border = ctypes.c_uint(_DWM_BORDER_COLOR)
+            hr2 = ctypes.windll.dwmapi.DwmSetWindowAttribute(
+                hwnd,
+                _DWMWA_BORDER_COLOR,
+                ctypes.byref(border),
+                ctypes.sizeof(border),
+            )
+            logging.info(
+                "DWM round hr=0x%08x, border-color hr=0x%08x",
+                hr1 & 0xFFFFFFFF,
+                hr2 & 0xFFFFFFFF,
+            )
         except Exception as exc:
-            logging.warning("DWM round-corner request failed: %s", exc)
+            logging.warning("DWM attribute request failed: %s", exc)
 
     def _setup_ui(self):
         outer_layout = QVBoxLayout()
@@ -102,11 +119,10 @@ class LyricsWidget(QWidget):
         self._panel = QFrame(self)
         self._panel.setObjectName("lyricsPanel")
         self._panel.setMouseTracking(True)
-        # Flat panel corners (0px); the rounded look comes from the DWM window
-        # corner, so the panel must not draw a second, mismatched radius.
+        # No panel border/radius: the green frame and rounded corners are both
+        # drawn by the DWM on the window itself (see _apply_dwm_rounding).
         self._panel.setStyleSheet(
-            f"#lyricsPanel {{ background-color: {PANEL_BACKGROUND}; "
-            f"border: 1px solid {SPOTIFY_GREEN}; border-radius: 0px; }}"
+            f"#lyricsPanel {{ background-color: {PANEL_BACKGROUND}; }}"
         )
 
         layout = QVBoxLayout(self._panel)
