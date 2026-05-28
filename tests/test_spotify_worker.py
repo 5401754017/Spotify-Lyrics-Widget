@@ -1,3 +1,4 @@
+import logging
 import time
 from unittest.mock import MagicMock, patch
 
@@ -245,6 +246,28 @@ class TestSpotifyWorkerNetworkError:
 
         worker._poll_once()
         assert len(recovered_signals) == 1
+
+
+@patch("src.spotify_worker.httpx.get")
+def test_poll_once_warns_with_concrete_reason_on_network_error(mock_get, caplog):
+    from src.spotify_worker import SpotifyWorker
+
+    mock_get.side_effect = httpx.ConnectError("no internet")
+    mock_config = MagicMock()
+    mock_config.token_expires_at = int(time.time()) + 3600
+    mock_config.access_token = "valid"
+
+    worker = SpotifyWorker(mock_config)
+    caplog.set_level(logging.WARNING, logger="root")
+    worker._poll_once()
+
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert any(
+        "Spotify currently-playing" in r.message
+        and "ConnectError" in r.message
+        and "no internet" in r.message
+        for r in warnings
+    ), f"expected concrete network-failure warning, got: {[r.message for r in warnings]}"
 
 
 class TestSpotifyWorkerRateLimit:

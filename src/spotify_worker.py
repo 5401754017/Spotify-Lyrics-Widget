@@ -169,7 +169,12 @@ class SpotifyWorker(QThread):
 
         try:
             response = self._make_spotify_request()
-        except (httpx.ConnectError, httpx.TimeoutException):
+        except (httpx.ConnectError, httpx.TimeoutException) as error:
+            logging.warning(
+                "Spotify currently-playing request failed: %s: %s",
+                type(error).__name__,
+                error,
+            )
             if not self._network_failed:
                 self._network_failed = True
                 self.network_error.emit()
