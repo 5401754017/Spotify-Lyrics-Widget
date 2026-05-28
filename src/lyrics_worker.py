@@ -1,3 +1,4 @@
+import logging
 import re
 from dataclasses import dataclass
 from enum import Enum, auto
@@ -203,14 +204,24 @@ class LyricsWorker(QThread):
             cached = self._cache.get(info.track_id)
             if cached is not LyricsCache.MISS:
                 if cached is LyricsCache.NO_LYRICS:
+                    logging.info("cache hit for %s (track_id=%s, no lyrics)",
+                                 info.track_name, info.track_id)
                     self.no_lyrics.emit(info.track_id)
                 else:
+                    logging.info("cache hit for %s (track_id=%s, %d lines)",
+                                 info.track_name, info.track_id, len(cached))
                     self.lyrics_ready.emit(info.track_id, cached)
                 return
 
             try:
                 result = fetch_lyrics_from_lrclib(info)
-            except (httpx.ConnectError, LrclibUnavailableError):
+            except (httpx.ConnectError, LrclibUnavailableError) as error:
+                logging.warning(
+                    "LRCLIB failed for %s (track_id=%s): %s: %s",
+                    info.track_name, info.track_id, type(error).__name__, error,
+                )
+                logging.info("emit lyrics_unavailable for %s (track_id=%s, no cache write)",
+                             info.track_name, info.track_id)
                 self.lyrics_unavailable.emit(info.track_id)
                 return
 
@@ -219,13 +230,25 @@ class LyricsWorker(QThread):
                     result = fetch_lyrics_from_netease(
                         info.track_name, info.artist_name, info.duration_ms
                     )
-                except NeteaseUnavailableError:
+                except NeteaseUnavailableError as error:
+                    logging.warning(
+                        "NetEase failed for %s (track_id=%s): %s: %s",
+                        info.track_name, info.track_id, type(error).__name__, error,
+                    )
+                    logging.info("emit lyrics_unavailable for %s (track_id=%s, no cache write)",
+                                 info.track_name, info.track_id)
                     self.lyrics_unavailable.emit(info.track_id)
                     return
 
             if result:
                 self._cache.set(info.track_id, result)
+                logging.info("emit lyrics_ready for %s (track_id=%s, %d lines)",
+                             info.track_name, info.track_id, len(result))
                 self.lyrics_ready.emit(info.track_id, result)
             else:
                 self._cache.set_no_lyrics(info.track_id)
+                logging.info(
+                    "emit no_lyrics for %s (track_id=%s, both LRCLIB and NetEase confirmed miss, caching NO_LYRICS)",
+                    info.track_name, info.track_id,
+                )
                 self.no_lyrics.emit(info.track_id)

@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock, patch
 
 import httpx
@@ -378,3 +379,76 @@ def test_both_miss_caches_no_lyrics(mock_lrclib, mock_netease, qtbot):
     worker = _pending_worker(netease_fallback=True)
     worker.run()
     assert worker._cache.get("t1") is worker._cache.NO_LYRICS
+
+
+# ---- V1.5 Task 1: worker exit-point logging ----
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib",
+       side_effect=LrclibUnavailableError("lrclib search timeout: read timed out"))
+def test_run_warns_on_lrclib_unavailable_with_concrete_reason(mock_lrclib, qtbot, caplog):
+    worker = _pending_worker(netease_fallback=False)
+    caplog.set_level(logging.INFO)
+    worker.run()
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    infos = [r for r in caplog.records if r.levelname == "INFO"]
+    assert any("LRCLIB failed" in r.message and "Song" in r.message
+               and "LrclibUnavailableError" in r.message
+               and "search timeout" in r.message for r in warnings), \
+        f"expected concrete LRCLIB-failure warning, got: {[r.message for r in warnings]}"
+    assert any("lyrics_unavailable" in r.message and "t1" in r.message for r in infos)
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease")
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_run_warns_on_netease_unavailable_with_concrete_reason(mock_lrclib, mock_netease, qtbot, caplog):
+    from src.netease import NeteaseUnavailableError
+    mock_netease.side_effect = NeteaseUnavailableError("NetEase rate limited")
+    worker = _pending_worker(netease_fallback=True)
+    caplog.set_level(logging.INFO)
+    worker.run()
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert any("NetEase failed" in r.message and "Song" in r.message
+               and "rate limited" in r.message for r in warnings), \
+        f"expected concrete NetEase-failure warning, got: {[r.message for r in warnings]}"
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=[(1000, "hi")])
+def test_run_logs_lyrics_ready_emit(mock_lrclib, qtbot, caplog):
+    worker = _pending_worker(netease_fallback=False)
+    caplog.set_level(logging.INFO)
+    worker.run()
+    infos = [r for r in caplog.records if r.levelname == "INFO"]
+    assert any("lyrics_ready" in r.message and "t1" in r.message
+               and "1 lines" in r.message for r in infos)
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease", return_value=None)
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", return_value=None)
+def test_run_logs_no_lyrics_emit_with_both_miss(mock_lrclib, mock_netease, qtbot, caplog):
+    worker = _pending_worker(netease_fallback=True)
+    caplog.set_level(logging.INFO)
+    worker.run()
+    infos = [r for r in caplog.records if r.levelname == "INFO"]
+    assert any("no_lyrics" in r.message and "t1" in r.message
+               and "both" in r.message.lower() for r in infos)
+
+
+def test_run_logs_cache_hit_lyrics(qtbot, caplog):
+    worker = _pending_worker(netease_fallback=True)
+    worker._cache.set("t1", [(0, "cached")])
+    caplog.set_level(logging.INFO)
+    worker.run()
+    infos = [r for r in caplog.records if r.levelname == "INFO"]
+    assert any("cache hit" in r.message and "t1" in r.message
+               and "1 lines" in r.message for r in infos)
+
+
+def test_run_logs_cache_hit_no_lyrics(qtbot, caplog):
+    worker = _pending_worker(netease_fallback=True)
+    worker._cache.set_no_lyrics("t1")
+    caplog.set_level(logging.INFO)
+    worker.run()
+    infos = [r for r in caplog.records if r.levelname == "INFO"]
+    assert any("cache hit" in r.message and "t1" in r.message
+               and "no lyrics" in r.message for r in infos)
