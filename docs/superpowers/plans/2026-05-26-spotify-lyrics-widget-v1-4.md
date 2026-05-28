@@ -723,6 +723,28 @@ git commit -m "feat: use NetEase fallback only on LRCLIB confirmed miss (V1.4)"
 
 ---
 
+---
+
+## Verification recorded (2026-05-28)
+
+**Live widget run on `feature/v1-4-netease-fallback` (HEAD `2b26a26`).** Three confirmed NetEase fallback hits in `%APPDATA%/spotify-lyrics-widget/widget.log.1`:
+
+```
+2026-05-28 20:30:10  INFO  NetEase fallback hit: 等待你那天 (for 等待你那天)
+2026-05-28 20:32:00  INFO  NetEase fallback hit: 記得呼吸 (for 記得呼吸)
+2026-05-28 20:35:19  INFO  NetEase fallback hit: 空拍   (for 空拍)
+```
+
+The remaining session also recorded an LRCLIB hit on a separate track (`你到底在選擇什麼`), confirming both branches of the fallback gate behave correctly. NetEase lyrics arrive in Traditional Chinese with credit lines filtered (matches `_clean_lyric` in `src/netease.py`); on-screen rendering matches log-emitted line counts.
+
+**Symptom discovered + root cause:** an earlier attempt at `等待你那天` (00:15:25) displayed "歌詞沒辦法取得" because LRCLIB `/search` `ReadTimeout`'d under transient throttling (induced by the verification queries themselves) — the worker correctly took the unavailable branch and skipped NetEase per spec, but `lyrics_worker.run()` logs **nothing** at that branch, so the root cause was only recoverable by re-running `httpx.get` outside the widget. This visibility gap is the V1.5 trigger:
+
+- Plan: `docs/superpowers/plans/2026-05-28-spotify-lyrics-widget-v1-5-logging-hygiene.md`
+
+Whether the spec gate itself should change (LRCLIB-unavailable also routes to NetEase) is a **design question**, deliberately deferred from V1.5 and routed to Codex consensus per `memory/codex-consensus-and-validate-before-adopting.md`.
+
+---
+
 ## Execution Handoff
 
 **Plan saved. Two execution options:**
