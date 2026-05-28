@@ -452,3 +452,68 @@ def test_run_logs_cache_hit_no_lyrics(qtbot, caplog):
     infos = [r for r in caplog.records if r.levelname == "INFO"]
     assert any("cache hit" in r.message and "t1" in r.message
                and "no lyrics" in r.message for r in infos)
+
+
+# ---- V1.5 Task 2: LRCLIB fetch decision-point logging ----
+
+
+class TestLrclibFetchLogs:
+    @patch("src.lyrics_worker.httpx.get")
+    def test_get_hit_logs_one_line(self, mock_get, caplog):
+        mock_get.return_value = MagicMock(
+            status_code=200,
+            json=lambda: {"syncedLyrics": "[00:01.00]hi"},
+        )
+        info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+        caplog.set_level(logging.INFO)
+        result = fetch_lyrics_from_lrclib(info)
+        assert result == [(1000, "hi")]
+        assert any("LRCLIB /get hit" in r.message and "Song" in r.message
+                   and "1 lines" in r.message for r in caplog.records)
+
+    @patch("src.lyrics_worker.httpx.get")
+    def test_get_404_then_search_hit_logs_both(self, mock_get, caplog):
+        mock_get.side_effect = [
+            MagicMock(status_code=404, text="not found"),
+            MagicMock(status_code=200, json=lambda: [
+                {"trackName": "Song", "artistName": "Artist",
+                 "duration": 180, "syncedLyrics": "[00:02.00]yo"},
+            ]),
+        ]
+        info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+        caplog.set_level(logging.INFO)
+        result = fetch_lyrics_from_lrclib(info)
+        assert result == [(2000, "yo")]
+        messages = [r.message for r in caplog.records]
+        assert any("/get 404" in m and "trying /search" in m for m in messages)
+        assert any("LRCLIB /search hit" in m and "1 lines" in m for m in messages)
+
+    @patch("src.lyrics_worker.httpx.get")
+    def test_get_200_no_synced_then_search_empty_logs_fall_through_and_no_match(self, mock_get, caplog):
+        mock_get.side_effect = [
+            MagicMock(status_code=200, json=lambda: {"syncedLyrics": None, "plainLyrics": "x"}),
+            MagicMock(status_code=200, json=lambda: []),
+        ]
+        info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+        caplog.set_level(logging.INFO)
+        result = fetch_lyrics_from_lrclib(info)
+        assert result is None
+        messages = [r.message for r in caplog.records]
+        assert any("/get 200 no syncedLyrics" in m and "trying /search" in m for m in messages)
+        assert any("/search no acceptable match" in m and "0 results" in m for m in messages)
+
+    @patch("src.lyrics_worker.httpx.get")
+    def test_search_ranking_rejects_all_logs_concrete_reason(self, mock_get, caplog):
+        mock_get.side_effect = [
+            MagicMock(status_code=404, text=""),
+            MagicMock(status_code=200, json=lambda: [
+                {"trackName": "Other", "artistName": "Other",
+                 "duration": 999, "syncedLyrics": "[00:01.00]x"},
+            ]),
+        ]
+        info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
+        caplog.set_level(logging.INFO)
+        result = fetch_lyrics_from_lrclib(info)
+        assert result is None
+        messages = [r.message for r in caplog.records]
+        assert any("/search no acceptable match" in m and "1 results" in m for m in messages)

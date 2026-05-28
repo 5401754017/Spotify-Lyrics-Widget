@@ -143,11 +143,17 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
     except httpx.TimeoutException as error:
         raise LrclibUnavailableError(f"lrclib timeout: {error}") from error
 
+    get_status = response.status_code
     data = _lrclib_json_or_unavailable(response)
-    if data:
-        synced_lyrics = data.get("syncedLyrics")
-        if synced_lyrics:
-            return parse_lrc(synced_lyrics)
+    synced = data.get("syncedLyrics") if isinstance(data, dict) else None
+    if synced:
+        parsed = parse_lrc(synced)
+        logging.info("LRCLIB /get hit for %s (%d lines)", info.track_name, len(parsed))
+        return parsed
+    if get_status == 200:
+        logging.info("LRCLIB /get 200 no syncedLyrics for %s, trying /search", info.track_name)
+    else:
+        logging.info("LRCLIB /get %d for %s, trying /search", get_status, info.track_name)
 
     try:
         response = httpx.get(
@@ -170,7 +176,18 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
             target_artist=info.artist_name,
         )
         if best and best.get("syncedLyrics"):
-            return parse_lrc(best["syncedLyrics"])
+            parsed = parse_lrc(best["syncedLyrics"])
+            logging.info(
+                "LRCLIB /search hit for %s (%d lines, ranked from %d results)",
+                info.track_name, len(parsed), len(data),
+            )
+            return parsed
+        logging.info(
+            "LRCLIB /search no acceptable match for %s (%d results)",
+            info.track_name, len(data),
+        )
+        return None
+    logging.info("LRCLIB /search no acceptable match for %s (0 results)", info.track_name)
     return None
 
 
