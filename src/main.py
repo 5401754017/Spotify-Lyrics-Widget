@@ -146,8 +146,11 @@ class App(QObject):
                 )
                 self._apply_token_result(result)
                 return True
-            except Exception:
-                pass
+            except Exception as error:
+                logging.warning(
+                    "Token pre-refresh failed: %s: %s; falling through to OAuth",
+                    type(error).__name__, error,
+                )
 
         try:
             self._apply_token_result(run_oauth_flow(self._config.client_id))

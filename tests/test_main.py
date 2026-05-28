@@ -1,3 +1,4 @@
+import logging
 from unittest.mock import MagicMock, patch
 
 import src.main as main_module
@@ -323,3 +324,26 @@ def test_single_instance_guard_activates_existing_instance(qtbot):
     finally:
         first.close()
         second.close()
+
+
+# ---- V1.5 Task 3: token pre-refresh warning ----
+
+
+def test_ensure_auth_warns_when_pre_refresh_fails_then_falls_through(caplog):
+    app, config, _widget = _make_app()
+    config.token_expires_at = 0  # force expired so the pre-refresh branch runs
+    with (
+        patch("src.main.is_token_expired", return_value=True),
+        patch("src.main.refresh_access_token", side_effect=RuntimeError("refresh boom")),
+        patch("src.main.run_oauth_flow",
+              return_value={"access_token": "new", "expires_in": 3600}),
+    ):
+        caplog.set_level(logging.WARNING)
+        assert app._ensure_auth() is True
+
+    warnings = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert any("token pre-refresh failed" in r.message.lower()
+               and "RuntimeError" in r.message
+               and "refresh boom" in r.message
+               and "oauth" in r.message.lower() for r in warnings), \
+        f"expected pre-refresh fall-through warning, got: {[r.message for r in warnings]}"
