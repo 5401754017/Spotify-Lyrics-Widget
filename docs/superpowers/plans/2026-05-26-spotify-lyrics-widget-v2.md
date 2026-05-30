@@ -8,7 +8,7 @@
 
 **Tech Stack:** Python 3.12, PyQt6, httpx, pytest, pytest-qt. No new third-party dependencies.
 
-**Revision note (2026-05-31):** This canonical V2 file has been overwritten with the revised 2026-05-30 Claude x Codex plan. The previous 2026-05-26 content assumed fixed percentage top-row slots, predated V1.4/V1.5, and did not reflect the final user decisions: controls only appear on widget hover, the top row stays dark, individual button hover turns icons Spotify green, the center button uses play/pause glyphs, and lyrics stay Spotify green for V2. Keeping the revised content at this original path avoids sending future agents to two competing V2 plans.
+**Revision note (2026-05-31):** This canonical V2 file has been overwritten with the revised 2026-05-30 Claude x Codex plan, and the separate 2026-05-30 drafting file was removed afterward. The previous 2026-05-26 content assumed fixed percentage top-row slots, predated V1.4/V1.5, and did not reflect the final user decisions: controls only appear on widget hover, the top row stays dark, individual button hover turns icons Spotify green, the center button uses play/pause glyphs, and lyrics stay Spotify green for V2.
 
 ---
 
