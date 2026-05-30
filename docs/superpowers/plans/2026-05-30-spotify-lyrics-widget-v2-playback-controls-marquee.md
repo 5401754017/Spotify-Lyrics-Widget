@@ -1,5 +1,7 @@
 # Spotify Lyrics Widget V2 Playback Controls + Marquee Implementation Plan
 
+> **Archived drafting path:** This revised plan has been folded into the canonical V2 file at `docs/superpowers/plans/2026-05-26-spotify-lyrics-widget-v2.md` on 2026-05-31. Future V2 implementation should follow that canonical path; this file remains only as the original 2026-05-30 drafting copy from the Claude x Codex consensus.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add hover-only Spotify-style playback controls and a hover-only long-title marquee without changing the widget's fixed 420x112 footprint or reintroducing layout jumps.
@@ -8,7 +10,7 @@
 
 **Tech Stack:** Python 3.12, PyQt6, httpx, pytest, pytest-qt. No new third-party dependencies.
 
-**Supersedes:** `docs/superpowers/plans/2026-05-26-spotify-lyrics-widget-v2.md`. That older plan was written before V1.4/V1.5 and before the revised V2 visual consensus below.
+**Drafting note:** This 2026-05-30 draft originally superseded `docs/superpowers/plans/2026-05-26-spotify-lyrics-widget-v2.md`. On 2026-05-31, the revised content was copied into that canonical 2026-05-26 path, so this file is no longer the implementation entry point.
 
 ---
 
