@@ -388,3 +388,33 @@ def test_ensure_auth_reauths_when_scope_is_stale():
 
     oauth.assert_called_once_with(config.client_id)
     refresh.assert_not_called()
+
+
+def test_connect_signals_wires_playback_controls():
+    app, _, widget = _make_app()
+    app._playback = MagicMock()
+
+    app._connect_signals()
+
+    widget.prev_clicked.connect.assert_called_once_with(app._playback.previous)
+    widget.next_clicked.connect.assert_called_once_with(app._playback.next)
+    widget.play_pause_clicked.connect.assert_called_once_with(app._on_play_pause_clicked)
+
+
+def test_play_pause_click_uses_latest_play_state():
+    app, _, _ = _make_app()
+    app._playback = MagicMock()
+    app._is_playing = True
+
+    app._on_play_pause_clicked()
+
+    app._playback.toggle.assert_called_once_with(True)
+
+
+def test_state_sync_updates_widget_playing_icon():
+    app, _, widget = _make_app()
+
+    app._on_state_synced(1234, True, 10.0)
+
+    assert app._is_playing is True
+    widget.set_playing.assert_called_once_with(True)
