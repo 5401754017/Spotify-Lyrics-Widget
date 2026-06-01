@@ -1,7 +1,7 @@
 import time
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCloseEvent, QFont
+from PyQt6.QtGui import QCloseEvent, QFont, QPalette
 
 from src.widget import LyricsWidget
 
@@ -44,6 +44,19 @@ def test_track_label_font_is_larger_and_demibold(qtbot):
     assert font.weight() >= QFont.Weight.DemiBold.value
 
 
+def test_track_label_palette_is_white_for_custom_paint(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    assert (
+        widget._track_label.palette()
+        .color(QPalette.ColorRole.WindowText)
+        .name()
+        .upper()
+        == "#FFFFFF"
+    )
+
+
 def test_update_track_info(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
@@ -52,7 +65,9 @@ def test_update_track_info(qtbot):
     assert "Test Artist" in widget._track_label.text()
 
 
-def test_long_track_info_elides_without_resizing_widget(qtbot):
+def test_long_track_info_overflows_without_resizing_widget(qtbot):
+    from src.marquee import MarqueeLabel
+
     widget = LyricsWidget()
     qtbot.addWidget(widget)
     widget.show()
@@ -66,7 +81,9 @@ def test_long_track_info_elides_without_resizing_widget(qtbot):
     qtbot.wait(50)
 
     assert widget.width() == initial_width
-    assert widget._track_label.text().endswith("...")
+    assert isinstance(widget._track_label, MarqueeLabel)
+    assert widget._track_label.text().startswith("This Is An Extremely Long Track Name")
+    assert widget._track_label._overflows() is True
 
 
 def test_widget_height_stays_fixed_for_one_two_and_long_lyrics(qtbot):
@@ -396,3 +413,23 @@ def test_transport_buttons_emit_widget_level_signals(qtbot):
 
     with qtbot.waitSignal(widget.next_clicked, timeout=1000):
         widget._next_btn.click()
+
+
+def test_hover_starts_and_stops_title_marquee(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+    widget.update_track_info(
+        "This is a very long title that should overflow the top row by a wide margin",
+        "An equally long artist name",
+    )
+
+    widget._on_enter_hover()
+    assert widget._track_label._timer.isActive()
+
+    widget._on_leave_hover()
+    assert not widget._track_label._timer.isActive()
+    assert widget._track_label._offset == 0

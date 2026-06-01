@@ -5,10 +5,12 @@ import time
 
 from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
+    QColor,
     QCloseEvent,
     QEnterEvent,
     QFont,
     QMouseEvent,
+    QPalette,
 )
 from PyQt6.QtWidgets import (
     QFrame,
@@ -22,6 +24,7 @@ from PyQt6.QtWidgets import (
 
 from src.fonts import app_font_family
 from src.lrc_parser import find_current_line
+from src.marquee import MarqueeLabel
 from src.transport_button import TransportButton
 
 
@@ -35,7 +38,6 @@ WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
-OVERLAY_GUTTER_WIDTH = 92
 CONTROLS_CLUSTER_WIDTH = 72
 CONTROLS_CLUSTER_HEIGHT = 24
 CLOSE_SLOT_WIDTH = 28
@@ -143,9 +145,12 @@ class LyricsWidget(QWidget):
         top_row = QHBoxLayout(self._top_row)
         top_row.setContentsMargins(0, 0, CLOSE_SLOT_WIDTH, 0)
         top_row.setSpacing(0)
-        self._track_label = QLabel("")
+        self._track_label = MarqueeLabel("")
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
         self._track_label.setStyleSheet(f"color: {WHITE};")
+        track_palette = self._track_label.palette()
+        track_palette.setColor(QPalette.ColorRole.WindowText, QColor(WHITE))
+        self._track_label.setPalette(track_palette)
         self._track_label.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
@@ -215,7 +220,7 @@ class LyricsWidget(QWidget):
 
     def update_track_info(self, track_name: str, artist_name: str):
         self._track_text_full = f"{track_name} — {artist_name}"
-        self._refresh_track_label_text()
+        self._track_label.setText(self._track_text_full)
 
     def set_lyrics(self, lyrics: list[tuple[int, str]]):
         self._lyrics = lyrics
@@ -288,23 +293,7 @@ class LyricsWidget(QWidget):
         self._play_pause_btn.set_mode("pause" if is_playing else "play")
 
     def _refresh_track_label_text(self):
-        if not self._track_text_full:
-            self._track_label.setText("")
-            return
-
-        width = max(
-            self._track_label.width(),
-            self.width() - 32 - OVERLAY_GUTTER_WIDTH,
-            1,
-        )
-        text = self._track_label.fontMetrics().elidedText(
-            self._track_text_full,
-            Qt.TextElideMode.ElideRight,
-            width,
-        )
-        if text.endswith("…"):
-            text = f"{text[:-1]}..."
-        self._track_label.setText(text)
+        self._track_label.update()
 
     def _on_ui_tick(self):
         if not self._is_playing:
@@ -335,12 +324,14 @@ class LyricsWidget(QWidget):
     def _on_enter_hover(self):
         self._close_btn.setVisible(True)
         self._controls_cluster.setVisible(True)
+        self._track_label.start_marquee()
 
     def _on_leave_hover(self):
         if self.underMouse():
             return
         self._close_btn.setVisible(False)
         self._controls_cluster.setVisible(False)
+        self._track_label.stop_marquee()
 
     def enterEvent(self, event: QEnterEvent):
         self._on_enter_hover()
