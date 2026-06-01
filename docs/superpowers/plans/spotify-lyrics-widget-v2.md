@@ -924,20 +924,18 @@ Remove `OVERLAY_GUTTER_WIDTH`.
         self._controls_cluster.move(controls_x, 8)
 ```
 
-7. Replace `_refresh_track_label_text()` width calculation:
+At the V1.5 baseline, `_panel` fills the fixed `420px` widget (`x=0, width=420`), so this places the `72px` controls cluster at `left=174`. The geometry tests assert the cluster's left edge, not its center.
 
-```python
-        width = max(self._track_label.width(), self.width() - 32 - 28, 1)
-```
+Task 3 does not change `_refresh_track_label_text()`. Title eliding, title width behavior, and marquee behavior are owned by Task 4 after `MarqueeLabel` is introduced.
 
-8. Add `set_playing()`:
+7. Add `set_playing()`:
 
 ```python
     def set_playing(self, is_playing: bool):
         self._play_pause_btn.set_mode("pause" if is_playing else "play")
 ```
 
-9. Update hover handlers:
+8. Update hover handlers:
 
 ```python
     def _on_enter_hover(self):
@@ -1317,6 +1315,8 @@ In `src/main.py`, add import:
 from src.playback import PlaybackController
 ```
 
+Keep the existing `pyqtSlot` import from `PyQt6.QtCore`; current `src/main.py` already imports it.
+
 In `App.__init__()`, after creating `_lyrics_worker`:
 
 ```python
@@ -1403,13 +1403,14 @@ Verify:
 1. First launch after V2 opens browser for Spotify reauthorization exactly once because stored scope lacks `user-modify-playback-state`.
 2. Relaunch after authorizing does not prompt again.
 3. Hover shows previous / circular play-pause / next / close; leaving hover hides all controls.
-4. Hover controls do not move title, lyric lane, or progress bar.
-5. Center button shows pause bars while Spotify is playing and play triangle while paused.
-6. Clicking play/pause toggles Spotify and updates the icon within the next poll.
-7. Next/previous change tracks.
-8. Long title is left-aligned and elided at rest; while hovered, it scrolls only if overflowing.
-9. Lyrics remain Spotify green.
-10. `widget.log` records playback API failures or 429 cooldowns if they occur.
+4. Hover previous, play/pause, and next individually; each icon turns Spotify green (`#1DB954`) only while that button is hovered, then returns to white.
+5. Hover controls do not move title, lyric lane, or progress bar.
+6. Center button shows pause bars while Spotify is playing and play triangle while paused.
+7. Clicking play/pause toggles Spotify and updates the icon within the next poll.
+8. Next/previous change tracks.
+9. Long title is left-aligned and elided at rest; while hovered, it scrolls only if overflowing.
+10. Lyrics remain Spotify green.
+11. `widget.log` records playback API failures or 429 cooldowns if they occur.
 
 - [ ] **Step 3: Update roadmap**
 
