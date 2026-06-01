@@ -22,6 +22,7 @@ from PyQt6.QtWidgets import (
 
 from src.fonts import app_font_family
 from src.lrc_parser import find_current_line
+from src.transport_button import TransportButton
 
 
 PANEL_BACKGROUND = "#121212"
@@ -32,9 +33,12 @@ DARK_GRAY = "#282828"
 UI_TIMER_INTERVAL_MS = 150
 WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
-TOP_ROW_HEIGHT = 20
-LYRIC_LANE_HEIGHT = 60
+TOP_ROW_HEIGHT = 24
+LYRIC_LANE_HEIGHT = 56
 OVERLAY_GUTTER_WIDTH = 92
+CONTROLS_CLUSTER_WIDTH = 72
+CONTROLS_CLUSTER_HEIGHT = 24
+CLOSE_SLOT_WIDTH = 28
 CORNER_RADIUS = 12
 
 # Windows 11 DWM rounded-corner experiment (DwmSetWindowAttribute)
@@ -49,6 +53,9 @@ class LyricsWidget(QWidget):
     """Frameless always-on-top floating lyrics widget."""
 
     close_requested = pyqtSignal()
+    prev_clicked = pyqtSignal()
+    play_pause_clicked = pyqtSignal()
+    next_clicked = pyqtSignal()
 
     def __init__(self):
         super().__init__()
@@ -134,14 +141,15 @@ class LyricsWidget(QWidget):
         self._top_row = QWidget(self._panel)
         self._top_row.setFixedHeight(TOP_ROW_HEIGHT)
         top_row = QHBoxLayout(self._top_row)
-        top_row.setContentsMargins(0, 0, 0, 0)
+        top_row.setContentsMargins(0, 0, CLOSE_SLOT_WIDTH, 0)
         top_row.setSpacing(0)
         self._track_label = QLabel("")
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
         self._track_label.setStyleSheet(f"color: {WHITE};")
-        self._track_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._track_label.setAlignment(
+            Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
+        )
         top_row.addWidget(self._track_label, stretch=1)
-        top_row.addSpacing(OVERLAY_GUTTER_WIDTH)
 
         self._close_btn = QPushButton("✕", self._panel)
         self._close_btn.setFixedSize(20, 20)
@@ -152,6 +160,27 @@ class LyricsWidget(QWidget):
         self._close_btn.clicked.connect(self.close)
         self._close_btn.setVisible(False)
         layout.addWidget(self._top_row)
+
+        self._controls_cluster = QWidget(self._panel)
+        self._controls_cluster.setFixedSize(
+            CONTROLS_CLUSTER_WIDTH, CONTROLS_CLUSTER_HEIGHT
+        )
+        self._controls_cluster.setMouseTracking(True)
+        controls_layout = QHBoxLayout(self._controls_cluster)
+        controls_layout.setContentsMargins(0, 0, 0, 0)
+        controls_layout.setSpacing(6)
+
+        self._prev_btn = TransportButton("previous", self._controls_cluster)
+        self._play_pause_btn = TransportButton("play", self._controls_cluster)
+        self._next_btn = TransportButton("next", self._controls_cluster)
+        controls_layout.addWidget(self._prev_btn)
+        controls_layout.addWidget(self._play_pause_btn)
+        controls_layout.addWidget(self._next_btn)
+
+        self._prev_btn.clicked.connect(self.prev_clicked)
+        self._play_pause_btn.clicked.connect(self.play_pause_clicked)
+        self._next_btn.clicked.connect(self.next_clicked)
+        self._controls_cluster.setVisible(False)
 
         self._lyric_label = QLabel("")
         self._lyric_label.setFont(QFont(app_font_family(), 16, QFont.Weight.Bold))
@@ -250,6 +279,13 @@ class LyricsWidget(QWidget):
         if hasattr(self, "_close_btn"):
             panel_width = max(self._panel.width(), self.width())
             self._close_btn.move(panel_width - 30, 8)
+            self._controls_cluster.move(
+                (panel_width - CONTROLS_CLUSTER_WIDTH) // 2,
+                8,
+            )
+
+    def set_playing(self, is_playing: bool):
+        self._play_pause_btn.set_mode("pause" if is_playing else "play")
 
     def _refresh_track_label_text(self):
         if not self._track_text_full:
@@ -298,9 +334,13 @@ class LyricsWidget(QWidget):
 
     def _on_enter_hover(self):
         self._close_btn.setVisible(True)
+        self._controls_cluster.setVisible(True)
 
     def _on_leave_hover(self):
+        if self.underMouse():
+            return
         self._close_btn.setVisible(False)
+        self._controls_cluster.setVisible(False)
 
     def enterEvent(self, event: QEnterEvent):
         self._on_enter_hover()

@@ -310,3 +310,89 @@ def test_rate_limited_state_uses_fixed_layout(qtbot):
     assert widget._track_label.geometry() == track_geometry
     assert widget._lyric_label.geometry() == lyric_geometry
     assert "rate limited" in widget._lyric_label.text()
+
+
+def test_transport_controls_are_hover_only_and_do_not_move_title(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+    widget.update_track_info("A very long song title that needs eliding", "Artist")
+
+    title_before = widget._track_label.geometry()
+    assert not widget._controls_cluster.isVisible()
+
+    widget._on_enter_hover()
+    title_hover = widget._track_label.geometry()
+
+    assert widget._controls_cluster.isVisible()
+    assert title_hover == title_before
+
+    widget._on_leave_hover()
+    assert not widget._controls_cluster.isVisible()
+    assert widget._track_label.geometry() == title_before
+
+
+def test_transport_controls_have_own_center_slot_and_close_has_own_slot(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+    widget._on_enter_hover()
+
+    controls = widget._controls_cluster.geometry()
+    close = widget._close_btn.geometry()
+
+    assert 170 <= controls.left() <= 180
+    assert controls.width() == 72
+    assert close.left() >= 360
+    assert controls.right() < close.left()
+
+
+def test_title_label_elides_before_close_button_slot(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+
+    title_right = widget._track_label.mapTo(
+        widget._panel,
+        widget._track_label.rect().topRight(),
+    ).x()
+
+    assert title_right < widget._close_btn.geometry().left()
+
+
+def test_play_pause_button_reflects_playing_state(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    widget.set_playing(True)
+    assert widget._play_pause_btn.mode == "pause"
+
+    widget.set_playing(False)
+    assert widget._play_pause_btn.mode == "play"
+
+
+def test_transport_buttons_emit_widget_level_signals(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    with qtbot.waitSignal(widget.prev_clicked, timeout=1000):
+        widget._prev_btn.click()
+
+    with qtbot.waitSignal(widget.play_pause_clicked, timeout=1000):
+        widget._play_pause_btn.click()
+
+    with qtbot.waitSignal(widget.next_clicked, timeout=1000):
+        widget._next_btn.click()
