@@ -505,7 +505,7 @@ PLAY_URL = "https://api.spotify.com/v1/me/player/play"
 PAUSE_URL = "https://api.spotify.com/v1/me/player/pause"
 NEXT_URL = "https://api.spotify.com/v1/me/player/next"
 PREVIOUS_URL = "https://api.spotify.com/v1/me/player/previous"
-BODY_SNIPPET_LIMIT = 180
+BODY_SNIPPET_LIMIT = 150
 DEFAULT_RETRY_AFTER_SECONDS = 1
 
 
