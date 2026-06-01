@@ -10,7 +10,7 @@ import httpx
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
-SCOPES = "user-read-currently-playing"
+SCOPES = "user-read-currently-playing user-modify-playback-state"
 
 _EXPIRY_BUFFER_SECONDS = 60
 
@@ -43,6 +43,12 @@ def build_auth_url(client_id: str, code_challenge: str, state: str) -> str:
 def is_token_expired(expires_at: int) -> bool:
     """Return whether a token is expired or inside the refresh buffer."""
     return time.time() >= expires_at - _EXPIRY_BUFFER_SECONDS
+
+
+def has_required_scopes(granted: str, required: str) -> bool:
+    """Return whether every required scope is present in the granted string."""
+    granted_set = set((granted or "").split())
+    return all(scope in granted_set for scope in required.split())
 
 
 def exchange_code_for_token(code: str, code_verifier: str, client_id: str) -> dict:

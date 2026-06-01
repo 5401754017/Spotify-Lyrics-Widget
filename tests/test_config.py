@@ -68,3 +68,11 @@ def test_default_appdata_path():
 def test_netease_fallback_defaults_to_true(tmp_path):
     from src.config import Config
     assert Config(config_dir=tmp_path).netease_fallback is True
+
+
+def test_granted_scope_defaults_to_empty_string(tmp_path):
+    from src.config import Config
+
+    config = Config(tmp_path)
+
+    assert config.granted_scope == ""

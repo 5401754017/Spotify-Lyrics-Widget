@@ -117,3 +117,36 @@ class TestRefreshToken:
 
         with pytest.raises(Exception, match="Token refresh failed"):
             refresh_access_token("bad_refresh", "client_id")
+
+
+def test_has_required_scopes_true_when_all_present():
+    from src.auth import has_required_scopes
+
+    granted = "user-read-currently-playing user-modify-playback-state"
+    required = "user-read-currently-playing user-modify-playback-state"
+
+    assert has_required_scopes(granted, required) is True
+
+
+def test_has_required_scopes_ignores_order_and_extras():
+    from src.auth import has_required_scopes
+
+    granted = "extra user-modify-playback-state user-read-currently-playing"
+    required = "user-read-currently-playing user-modify-playback-state"
+
+    assert has_required_scopes(granted, required) is True
+
+
+def test_has_required_scopes_false_when_missing():
+    from src.auth import has_required_scopes
+
+    granted = "user-read-currently-playing"
+    required = "user-read-currently-playing user-modify-playback-state"
+
+    assert has_required_scopes(granted, required) is False
+
+
+def test_has_required_scopes_false_when_empty():
+    from src.auth import has_required_scopes
+
+    assert has_required_scopes("", "user-read-currently-playing") is False

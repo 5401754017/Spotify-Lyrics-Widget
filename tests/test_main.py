@@ -9,6 +9,7 @@ from src.spotify_worker import PlayerState
 def _make_app():
     config = MagicMock()
     config.refresh_token = "existing_refresh"
+    config.granted_scope = "user-read-currently-playing user-modify-playback-state"
     widget = MagicMock()
 
     with (
@@ -347,3 +348,43 @@ def test_ensure_auth_warns_when_pre_refresh_fails_then_falls_through(caplog):
                and "refresh boom" in r.message
                and "oauth" in r.message.lower() for r in warnings), \
         f"expected pre-refresh fall-through warning, got: {[r.message for r in warnings]}"
+
+
+def test_apply_token_result_saves_granted_scope():
+    app, config, _ = _make_app()
+
+    with patch("src.main.time.time", return_value=1000):
+        app._apply_token_result(
+            {
+                "access_token": "access",
+                "expires_in": 3600,
+                "scope": "user-read-currently-playing user-modify-playback-state",
+            }
+        )
+
+    assert config.granted_scope == "user-read-currently-playing user-modify-playback-state"
+    config.save.assert_called_once()
+
+
+def test_ensure_auth_reauths_when_scope_is_stale():
+    app, config, _ = _make_app()
+    config.client_id = "client"
+    config.refresh_token = "existing_refresh"
+    config.granted_scope = "user-read-currently-playing"
+    config.token_expires_at = 9_999_999_999
+
+    with (
+        patch(
+            "src.main.run_oauth_flow",
+            return_value={
+                "access_token": "access",
+                "expires_in": 3600,
+                "scope": "user-read-currently-playing user-modify-playback-state",
+            },
+        ) as oauth,
+        patch("src.main.refresh_access_token") as refresh,
+    ):
+        assert app._ensure_auth() is True
+
+    oauth.assert_called_once_with(config.client_id)
+    refresh.assert_not_called()

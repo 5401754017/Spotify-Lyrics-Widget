@@ -11,6 +11,7 @@ class Config:
         "access_token": None,
         "refresh_token": None,
         "token_expires_at": 0,
+        "granted_scope": "",
         "window_x": 100,
         "window_y": 100,
         "netease_fallback": True,

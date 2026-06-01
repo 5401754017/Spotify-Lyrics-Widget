@@ -7,7 +7,7 @@ from PyQt6.QtCore import QObject, pyqtSlot
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
 
-from src.auth import is_token_expired, refresh_access_token
+from src.auth import SCOPES, has_required_scopes, is_token_expired, refresh_access_token
 from src.auth_server import run_oauth_flow
 from src.config import Config
 from src.fonts import load_app_font
@@ -134,12 +134,16 @@ class App(QObject):
         self._spotify_worker.start()
 
     def _ensure_auth(self) -> bool:
-        if self._config.refresh_token and not is_token_expired(
-            self._config.token_expires_at
+        scopes_ok = has_required_scopes(self._config.granted_scope, SCOPES)
+
+        if (
+            scopes_ok
+            and self._config.refresh_token
+            and not is_token_expired(self._config.token_expires_at)
         ):
             return True
 
-        if self._config.refresh_token:
+        if scopes_ok and self._config.refresh_token:
             try:
                 result = refresh_access_token(
                     self._config.refresh_token, self._config.client_id
@@ -164,6 +168,8 @@ class App(QObject):
         self._config.token_expires_at = int(time.time()) + result["expires_in"]
         if "refresh_token" in result:
             self._config.refresh_token = result["refresh_token"]
+        if "scope" in result:
+            self._config.granted_scope = result["scope"]
         self._config.save()
 
     def _connect_signals(self):
