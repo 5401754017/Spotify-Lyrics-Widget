@@ -8,13 +8,13 @@
 
 **Tech Stack:** Python 3.12, PyQt6, httpx, pytest, pytest-qt. No new third-party dependencies.
 
-**Revision note (2026-05-31):** This canonical V2 file has been overwritten with the revised 2026-05-30 Claude x Codex plan, and the separate 2026-05-30 drafting file was removed afterward. The previous 2026-05-26 content assumed fixed percentage top-row slots, predated V1.4/V1.5, and did not reflect the final user decisions: controls only appear on widget hover, the top row stays dark, individual button hover turns icons Spotify green, the center button uses play/pause glyphs, and lyrics stay Spotify green for V2.
+**Revision note (2026-05-31 / renamed 2026-06-01):** This canonical V2 file contains the revised 2026-05-30 Claude x Codex plan. It replaced the old dated `2026-05-26-spotify-lyrics-widget-v2.md` path so future agents do not mistake the filename for an outdated plan. The previous 2026-05-26 content assumed fixed percentage top-row slots, predated V1.4/V1.5, and did not reflect the final user decisions: controls only appear on widget hover, individual button hover turns icons Spotify green, the center button uses play/pause glyphs, and lyrics stay Spotify green for V2.
 
 ---
 
 ## Current Baseline
 
-- Branch baseline: `master` after V1.4/V1.5 merge, at V1.5 commit `60f380e`. The revised plan was drafted on `codex-v2-plan` at `3bba0dd` and folded back into this canonical path.
+- Branch baseline: `master` after V1.4/V1.5 merge, at V1.5 commit `60f380e`. The revised plan was drafted on `codex-v2-plan` at `3bba0dd`, folded into the dated V2 plan, then renamed to this stable canonical path.
 - Current widget: fixed `420x112`, dark opaque frameless window, DWM rounded corners and Spotify-green DWM border.
 - Current top row: centered `QLabel`, `OVERLAY_GUTTER_WIDTH = 92`, hover-only close button absolutely positioned at the top right.
 - Current lyric lane: fixed `60px`, Spotify-green lyric/status text.
