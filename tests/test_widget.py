@@ -156,6 +156,28 @@ def test_update_lyric_line(qtbot):
     assert widget._lyric_label.text() == "Hello world"
 
 
+def test_long_visual_lyric_line_clamps_to_two_label_lines(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+
+    widget.set_lyric_text(
+        "You look away from me, and I see there's something you're trying "
+        "to hide, and I reach for your hand but it's cold"
+    )
+
+    lines = widget._lyric_label.text().splitlines()
+    metrics = widget._lyric_label.fontMetrics()
+
+    assert len(lines) == 2
+    assert lines[1].endswith("...")
+    assert all(
+        metrics.horizontalAdvance(line) <= widget._lyric_label.width()
+        for line in lines
+    )
+
+
 def test_update_progress_bar(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)

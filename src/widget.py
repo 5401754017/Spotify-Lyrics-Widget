@@ -23,6 +23,7 @@ from PyQt6.QtWidgets import (
 )
 
 from src.fonts import app_font_family
+from src.lyric_clamp import clamp_lyric_text
 from src.lrc_parser import find_current_line
 from src.marquee import MarqueeLabel
 from src.transport_button import TransportButton
@@ -229,9 +230,8 @@ class LyricsWidget(QWidget):
         self._current_line_idx = -1
 
     def set_lyric_text(self, text: str):
-        lines = text.splitlines()
-        if len(lines) > 2:
-            text = "\n".join(lines[:2])
+        width = max(self._lyric_label.width(), self.width() - 32, 1)
+        text = clamp_lyric_text(text, self._lyric_label.font(), width)
         self._lyric_label.setText(text)
 
     def set_duration(self, duration_ms: int):
