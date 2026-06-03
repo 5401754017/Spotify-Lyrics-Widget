@@ -40,7 +40,9 @@ TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
 CONTROLS_CLUSTER_WIDTH = 72
 CONTROLS_CLUSTER_HEIGHT = 24
+CONTROLS_CLOSE_GAP = 12
 CLOSE_SLOT_WIDTH = 28
+TOP_ROW_RIGHT_RESERVE = CONTROLS_CLUSTER_WIDTH + CONTROLS_CLOSE_GAP + CLOSE_SLOT_WIDTH
 CORNER_RADIUS = 12
 
 # Windows 11 DWM rounded-corner experiment (DwmSetWindowAttribute)
@@ -143,7 +145,7 @@ class LyricsWidget(QWidget):
         self._top_row = QWidget(self._panel)
         self._top_row.setFixedHeight(TOP_ROW_HEIGHT)
         top_row = QHBoxLayout(self._top_row)
-        top_row.setContentsMargins(0, 0, CLOSE_SLOT_WIDTH, 0)
+        top_row.setContentsMargins(0, 0, TOP_ROW_RIGHT_RESERVE, 0)
         top_row.setSpacing(0)
         self._track_label = MarqueeLabel("")
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
@@ -283,9 +285,10 @@ class LyricsWidget(QWidget):
     def _position_overlay_controls(self):
         if hasattr(self, "_close_btn"):
             panel_width = max(self._panel.width(), self.width())
-            self._close_btn.move(panel_width - 30, 8)
+            close_x = panel_width - 30
+            self._close_btn.move(close_x, 8)
             self._controls_cluster.move(
-                (panel_width - CONTROLS_CLUSTER_WIDTH) // 2,
+                close_x - CONTROLS_CLOSE_GAP - CONTROLS_CLUSTER_WIDTH,
                 8,
             )
 

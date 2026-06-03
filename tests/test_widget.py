@@ -352,7 +352,7 @@ def test_transport_controls_are_hover_only_and_do_not_move_title(qtbot):
     assert widget._track_label.geometry() == title_before
 
 
-def test_transport_controls_have_own_center_slot_and_close_has_own_slot(qtbot):
+def test_transport_controls_sit_between_title_and_close_slots(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -363,14 +363,18 @@ def test_transport_controls_have_own_center_slot_and_close_has_own_slot(qtbot):
 
     controls = widget._controls_cluster.geometry()
     close = widget._close_btn.geometry()
+    title_right = widget._track_label.mapTo(
+        widget._panel,
+        widget._track_label.rect().topRight(),
+    ).x()
 
-    assert 170 <= controls.left() <= 180
+    assert title_right < controls.left()
     assert controls.width() == 72
     assert close.left() >= 360
     assert controls.right() < close.left()
 
 
-def test_title_label_elides_before_close_button_slot(qtbot):
+def test_title_label_elides_before_transport_controls_slot(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -383,7 +387,7 @@ def test_title_label_elides_before_close_button_slot(qtbot):
         widget._track_label.rect().topRight(),
     ).x()
 
-    assert title_right < widget._close_btn.geometry().left()
+    assert title_right < widget._controls_cluster.geometry().left()
 
 
 def test_play_pause_button_reflects_playing_state(qtbot):

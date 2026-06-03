@@ -10,6 +10,8 @@
 
 **Revision note (2026-05-31 / renamed 2026-06-01):** This canonical V2 file contains the revised 2026-05-30 Claude x Codex plan. It replaced the old dated `2026-05-26-spotify-lyrics-widget-v2.md` path so future agents do not mistake the filename for an outdated plan. The previous 2026-05-26 content assumed fixed percentage top-row slots, predated V1.4/V1.5, and did not reflect the final user decisions: controls only appear on widget hover, individual button hover turns icons Spotify green, the center button uses play/pause glyphs, and lyrics stay Spotify green for V2.
 
+**Manual review adjustment (2026-06-03):** User review found that centered overlay controls visually cut through long title text. Final V2 geometry moves controls into a reserved right-side slot between the title/marquee area and the close button. The title still remains left-aligned and marquee-enabled on hover, but its paint area ends before the transport controls.
+
 ---
 
 ## Current Baseline
@@ -60,12 +62,12 @@ Widget width: 420
 Panel horizontal margins: 16 + 16
 Usable content width: 388
 
-0   16                         174        246                 390 410 420
-|   title text, left aligned   | controls | title can elide   | X |   |
-                                  prev play next
+0   16                         291 306        378 390 410 420
+|   title text / marquee       |   controls    | X |   |
+                                prev play next
 ```
 
-Implementation rule: controls and close button are absolute children of the panel/top area, not layout widgets. The title remains left-aligned in the layout and elides before the close button. Hiding/showing controls must not change the title label geometry, lyric lane geometry, or widget size. The controls sit visually above the top row only while hovered.
+Implementation rule: controls and close button are absolute children of the panel/top area, not layout widgets. The title remains left-aligned in the layout and elides before the controls slot. Hiding/showing controls must not change the title label geometry, lyric lane geometry, or widget size. The controls sit between the title/marquee area and the close button only while hovered.
 
 Height consensus:
 
@@ -809,7 +811,7 @@ def test_transport_controls_are_hover_only_and_do_not_move_title(qtbot):
     assert widget._track_label.geometry() == title_before
 
 
-def test_transport_controls_have_own_center_slot_and_close_has_own_slot(qtbot):
+def test_transport_controls_sit_between_title_and_close_slots(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -820,8 +822,12 @@ def test_transport_controls_have_own_center_slot_and_close_has_own_slot(qtbot):
 
     controls = widget._controls_cluster.geometry()
     close = widget._close_btn.geometry()
+    title_right = widget._track_label.mapTo(
+        widget._panel,
+        widget._track_label.rect().topRight(),
+    ).x()
 
-    assert 170 <= controls.left() <= 180
+    assert title_right < controls.left()
     assert controls.width() == 72
     assert close.left() >= 360
     assert controls.right() < close.left()
@@ -867,6 +873,9 @@ TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
 CONTROLS_CLUSTER_WIDTH = 72
 CONTROLS_CLUSTER_HEIGHT = 24
+CONTROLS_CLOSE_GAP = 12
+CLOSE_SLOT_WIDTH = 28
+TOP_ROW_RIGHT_RESERVE = CONTROLS_CLUSTER_WIDTH + CONTROLS_CLOSE_GAP + CLOSE_SLOT_WIDTH
 ```
 
 Remove `OVERLAY_GUTTER_WIDTH`.
@@ -882,6 +891,7 @@ Remove `OVERLAY_GUTTER_WIDTH`.
 4. In `_setup_ui()`, keep `_top_row` layout title-only:
 
 ```python
+        top_row.setContentsMargins(0, 0, TOP_ROW_RIGHT_RESERVE, 0)
         self._track_label = QLabel("")
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
         self._track_label.setStyleSheet(f"color: {WHITE};")
@@ -919,12 +929,15 @@ Remove `OVERLAY_GUTTER_WIDTH`.
 ```python
     def _position_overlay_controls(self):
         panel_width = max(self._panel.width(), self.width())
-        self._close_btn.move(panel_width - 30, 8)
-        controls_x = (panel_width - CONTROLS_CLUSTER_WIDTH) // 2
-        self._controls_cluster.move(controls_x, 8)
+        close_x = panel_width - 30
+        self._close_btn.move(close_x, 8)
+        self._controls_cluster.move(
+            close_x - CONTROLS_CLOSE_GAP - CONTROLS_CLUSTER_WIDTH,
+            8,
+        )
 ```
 
-At the V1.5 baseline, `_panel` fills the fixed `420px` widget (`x=0, width=420`), so this places the `72px` controls cluster at `left=174`. The geometry tests assert the cluster's left edge, not its center.
+At the V2 manual-review baseline, `_panel` fills the fixed `420px` widget (`x=0, width=420`), so this places the title at roughly `16..291`, the `72px` controls cluster at `306..377`, and the close button at `390..409`.
 
 Task 3 does not change `_refresh_track_label_text()`. Title eliding, title width behavior, and marquee behavior are owned by Task 4 after `MarqueeLabel` is introduced.
 
