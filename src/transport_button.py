@@ -5,7 +5,7 @@ from PyQt6.QtWidgets import QPushButton
 
 WHITE = "#FFFFFF"
 SPOTIFY_GREEN = "#1DB954"
-DARK_CIRCLE = "#282828"
+BUTTON_SIZE = QSize(18, 24)
 
 
 class TransportButton(QPushButton):
@@ -22,24 +22,19 @@ class TransportButton(QPushButton):
         self.setMouseTracking(True)
         self.setFlat(True)
         self.setStyleSheet("background: transparent; border: none;")
-        self.setFixedSize(QSize(24, 24) if mode in {"play", "pause"} else QSize(18, 24))
+        self.setFixedSize(BUTTON_SIZE)
 
     def set_mode(self, mode: str):
         if mode not in {"previous", "play", "pause", "next"}:
             raise ValueError(f"Unknown transport button mode: {mode}")
         self.mode = mode
-        self.setFixedSize(QSize(24, 24) if mode in {"play", "pause"} else QSize(18, 24))
+        self.setFixedSize(BUTTON_SIZE)
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
         icon_color = QColor(SPOTIFY_GREEN if self._hovered else WHITE)
-
-        if self.mode in {"play", "pause"}:
-            painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(DARK_CIRCLE))
-            painter.drawEllipse(0, 0, 24, 24)
 
         painter.setBrush(icon_color)
         painter.setPen(QPen(icon_color, 2))
@@ -49,16 +44,16 @@ class TransportButton(QPushButton):
             painter.drawPolygon(
                 QPolygonF(
                     [
-                        QPointF(10, 7),
-                        QPointF(10, 17),
-                        QPointF(17, 12),
+                        QPointF(5, 6),
+                        QPointF(5, 18),
+                        QPointF(16, 12),
                     ]
                 )
             )
         elif self.mode == "pause":
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawRoundedRect(8, 7, 3, 10, 1, 1)
-            painter.drawRoundedRect(14, 7, 3, 10, 1, 1)
+            painter.drawRect(5, 6, 3, 12)
+            painter.drawRect(12, 6, 3, 12)
         elif self.mode == "previous":
             painter.setPen(Qt.PenStyle.NoPen)
             painter.drawRect(3, 7, 2, 10)

@@ -353,7 +353,7 @@ def test_transport_controls_are_hover_only_and_do_not_move_title(qtbot):
 
 
 def test_transport_controls_sit_between_title_and_close_slots(qtbot):
-    from src.widget import LyricsWidget
+    from src.widget import CONTROLS_CLUSTER_WIDTH, LyricsWidget
 
     widget = LyricsWidget()
     qtbot.addWidget(widget)
@@ -369,9 +369,27 @@ def test_transport_controls_sit_between_title_and_close_slots(qtbot):
     ).x()
 
     assert title_right < controls.left()
-    assert controls.width() == 72
+    assert controls.width() == CONTROLS_CLUSTER_WIDTH
     assert close.left() >= 360
     assert controls.right() < close.left()
+
+
+def test_transport_controls_align_with_title_row_height(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+    widget._on_enter_hover()
+
+    controls_y = widget._controls_cluster.geometry().top()
+    title_y = widget._track_label.mapTo(
+        widget._panel,
+        widget._track_label.rect().topLeft(),
+    ).y()
+
+    assert controls_y == title_y
 
 
 def test_title_label_elides_before_transport_controls_slot(qtbot):

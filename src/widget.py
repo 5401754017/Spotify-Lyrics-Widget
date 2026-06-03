@@ -38,7 +38,7 @@ WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
-CONTROLS_CLUSTER_WIDTH = 72
+CONTROLS_CLUSTER_WIDTH = 66
 CONTROLS_CLUSTER_HEIGHT = 24
 CONTROLS_CLOSE_GAP = 12
 CLOSE_SLOT_WIDTH = 28
@@ -289,7 +289,7 @@ class LyricsWidget(QWidget):
             self._close_btn.move(close_x, 8)
             self._controls_cluster.move(
                 close_x - CONTROLS_CLOSE_GAP - CONTROLS_CLUSTER_WIDTH,
-                8,
+                self._top_row.y(),
             )
 
     def set_playing(self, is_playing: bool):
