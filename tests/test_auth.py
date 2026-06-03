@@ -40,6 +40,8 @@ class TestBuildAuthUrl:
         assert "response_type=code" in url
         assert "redirect_uri=http%3A%2F%2F127.0.0.1%3A8888%2Fcallback" in url
         assert "scope=user-read-currently-playing" in url
+        assert "user-read-playback-state" in url
+        assert "user-modify-playback-state" in url
         assert "state=test_state" in url
 
 
@@ -122,8 +124,14 @@ class TestRefreshToken:
 def test_has_required_scopes_true_when_all_present():
     from src.auth import has_required_scopes
 
-    granted = "user-read-currently-playing user-modify-playback-state"
-    required = "user-read-currently-playing user-modify-playback-state"
+    granted = (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
+    required = (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
 
     assert has_required_scopes(granted, required) is True
 
@@ -131,8 +139,14 @@ def test_has_required_scopes_true_when_all_present():
 def test_has_required_scopes_ignores_order_and_extras():
     from src.auth import has_required_scopes
 
-    granted = "extra user-modify-playback-state user-read-currently-playing"
-    required = "user-read-currently-playing user-modify-playback-state"
+    granted = (
+        "extra user-modify-playback-state user-read-playback-state "
+        "user-read-currently-playing"
+    )
+    required = (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
 
     assert has_required_scopes(granted, required) is True
 
@@ -140,8 +154,11 @@ def test_has_required_scopes_ignores_order_and_extras():
 def test_has_required_scopes_false_when_missing():
     from src.auth import has_required_scopes
 
-    granted = "user-read-currently-playing"
-    required = "user-read-currently-playing user-modify-playback-state"
+    granted = "user-read-currently-playing user-modify-playback-state"
+    required = (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
 
     assert has_required_scopes(granted, required) is False
 

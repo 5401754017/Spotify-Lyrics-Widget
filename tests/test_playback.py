@@ -3,6 +3,16 @@ from unittest.mock import MagicMock, patch
 import httpx
 
 
+def _response(status_code, text="", headers=None, json_data=None):
+    response = MagicMock(
+        status_code=status_code,
+        text=text,
+        headers=headers or {},
+    )
+    response.json.return_value = json_data if json_data is not None else {}
+    return response
+
+
 def test_build_control_request_maps_actions():
     from src.playback import build_control_request
 
@@ -121,3 +131,150 @@ def test_task_logs_request_exception(mock_request, caplog):
         "Playback control request failed" in r.message and "ConnectError" in r.message
         for r in caplog.records
     )
+
+
+@patch("src.playback.httpx.request")
+def test_play_task_retries_once_with_available_device(mock_request):
+    from src.playback import _ControlTask
+
+    mock_request.side_effect = [
+        _response(404, "No active device found"),
+        _response(
+            200,
+            json_data={
+                "devices": [
+                    {"id": "restricted", "is_active": False, "is_restricted": True},
+                    {"id": "device-1", "is_active": False, "is_restricted": False},
+                ]
+            },
+        ),
+        _response(204),
+    ]
+    on_done = MagicMock()
+    task = _ControlTask(
+        method="PUT",
+        url="https://api.spotify.com/v1/me/player/play",
+        access_token="token",
+        on_done=on_done,
+        on_rate_limited=MagicMock(),
+    )
+
+    task.run()
+
+    assert mock_request.call_count == 3
+    assert mock_request.call_args_list[1].args[:2] == (
+        "GET",
+        "https://api.spotify.com/v1/me/player/devices",
+    )
+    assert mock_request.call_args_list[2].args[:2] == (
+        "PUT",
+        "https://api.spotify.com/v1/me/player/play?device_id=device-1",
+    )
+    on_done.assert_called_once()
+
+
+@patch("src.playback.httpx.request")
+def test_play_task_prefers_active_available_device(mock_request):
+    from src.playback import _ControlTask
+
+    mock_request.side_effect = [
+        _response(404, "No active device found"),
+        _response(
+            200,
+            json_data={
+                "devices": [
+                    {"id": "device-1", "is_active": False, "is_restricted": False},
+                    {"id": "active-1", "is_active": True, "is_restricted": False},
+                ]
+            },
+        ),
+        _response(204),
+    ]
+    task = _ControlTask(
+        method="PUT",
+        url="https://api.spotify.com/v1/me/player/play",
+        access_token="token",
+        on_done=MagicMock(),
+        on_rate_limited=MagicMock(),
+    )
+
+    task.run()
+
+    assert mock_request.call_args_list[2].args[:2] == (
+        "PUT",
+        "https://api.spotify.com/v1/me/player/play?device_id=active-1",
+    )
+
+
+@patch("src.playback.httpx.request")
+def test_play_task_logs_when_no_available_device(mock_request, caplog):
+    from src.playback import _ControlTask
+
+    mock_request.side_effect = [
+        _response(404, "No active device found"),
+        _response(200, json_data={"devices": []}),
+    ]
+    task = _ControlTask(
+        method="PUT",
+        url="https://api.spotify.com/v1/me/player/play",
+        access_token="token",
+        on_done=MagicMock(),
+        on_rate_limited=MagicMock(),
+    )
+
+    task.run()
+
+    assert mock_request.call_count == 2
+    assert any("No available Spotify device" in r.message for r in caplog.records)
+
+
+@patch("src.playback.httpx.request")
+def test_play_task_does_not_retry_device_play_more_than_once(mock_request, caplog):
+    from src.playback import _ControlTask
+
+    mock_request.side_effect = [
+        _response(404, "No active device found"),
+        _response(
+            200,
+            json_data={
+                "devices": [
+                    {"id": "device-1", "is_active": False, "is_restricted": False}
+                ]
+            },
+        ),
+        _response(403, "Premium required"),
+    ]
+    task = _ControlTask(
+        method="PUT",
+        url="https://api.spotify.com/v1/me/player/play",
+        access_token="token",
+        on_done=MagicMock(),
+        on_rate_limited=MagicMock(),
+    )
+
+    task.run()
+
+    assert mock_request.call_count == 3
+    assert any("Playback control failed" in r.message for r in caplog.records)
+
+
+@patch("src.playback.httpx.request")
+def test_play_task_respects_device_lookup_retry_after(mock_request):
+    from src.playback import _ControlTask
+
+    mock_request.side_effect = [
+        _response(404, "No active device found"),
+        _response(429, "rate limited", headers={"Retry-After": "7"}),
+    ]
+    on_rate_limited = MagicMock()
+    task = _ControlTask(
+        method="PUT",
+        url="https://api.spotify.com/v1/me/player/play",
+        access_token="token",
+        on_done=MagicMock(),
+        on_rate_limited=on_rate_limited,
+    )
+
+    task.run()
+
+    on_rate_limited.assert_called_once_with(7)

@@ -10,7 +10,10 @@ import httpx
 SPOTIFY_AUTH_URL = "https://accounts.spotify.com/authorize"
 SPOTIFY_TOKEN_URL = "https://accounts.spotify.com/api/token"
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
-SCOPES = "user-read-currently-playing user-modify-playback-state"
+SCOPES = (
+    "user-read-currently-playing user-modify-playback-state "
+    "user-read-playback-state"
+)
 
 _EXPIRY_BUFFER_SECONDS = 60
 

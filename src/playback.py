@@ -1,6 +1,7 @@
 import logging
 import time
 from collections.abc import Callable
+from urllib.parse import urlencode
 
 import httpx
 from PyQt6.QtCore import QRunnable, QThreadPool
@@ -10,6 +11,7 @@ PLAY_URL = "https://api.spotify.com/v1/me/player/play"
 PAUSE_URL = "https://api.spotify.com/v1/me/player/pause"
 NEXT_URL = "https://api.spotify.com/v1/me/player/next"
 PREVIOUS_URL = "https://api.spotify.com/v1/me/player/previous"
+DEVICES_URL = "https://api.spotify.com/v1/me/player/devices"
 BODY_SNIPPET_LIMIT = 150
 DEFAULT_RETRY_AFTER_SECONDS = 1
 
@@ -42,29 +44,13 @@ class _ControlTask(QRunnable):
 
     def run(self):
         try:
-            response = httpx.request(
-                self.method,
-                self.url,
-                headers={"Authorization": f"Bearer {self.access_token}"},
-                timeout=5.0,
-            )
-            if response.status_code == 429:
-                retry_after = _parse_retry_after(response)
-                self.on_rate_limited(retry_after)
-                logging.warning(
-                    "Playback control rate limited: %s %s; retry after %s seconds",
-                    self.method,
-                    self.url,
-                    retry_after,
-                )
-            elif response.status_code >= 300:
-                logging.warning(
-                    "Playback control failed: %s %s -> %s %s",
-                    self.method,
-                    self.url,
-                    response.status_code,
-                    _body_snippet(response.text),
-                )
+            response = _request(self.method, self.url, self.access_token)
+            if self._handle_rate_limit(response):
+                return
+            if _should_retry_play_with_device(self.method, self.url, response):
+                self._retry_play_with_available_device()
+                return
+            _log_control_failure(self.method, self.url, response)
         except Exception as error:
             logging.warning(
                 "Playback control request failed: %s %s: %s: %s",
@@ -75,6 +61,45 @@ class _ControlTask(QRunnable):
             )
         finally:
             self.on_done()
+
+    def _retry_play_with_available_device(self):
+        response = _request("GET", DEVICES_URL, self.access_token)
+        if self._handle_rate_limit(response):
+            return
+        if response.status_code >= 300:
+            _log_control_failure("GET", DEVICES_URL, response)
+            return
+
+        device_id = _select_playback_device_id(response.json().get("devices", []))
+        if not device_id:
+            logging.warning("No available Spotify device for playback resume")
+            return
+
+        retry_url = _play_url(device_id)
+        retry_response = _request("PUT", retry_url, self.access_token)
+        if self._handle_rate_limit(retry_response):
+            return
+        _log_control_failure("PUT", retry_url, retry_response)
+
+    def _handle_rate_limit(self, response) -> bool:
+        if response.status_code != 429:
+            return False
+        retry_after = _parse_retry_after(response)
+        self.on_rate_limited(retry_after)
+        logging.warning(
+            "Playback control rate limited: retry after %s seconds",
+            retry_after,
+        )
+        return True
+
+
+def _request(method: str, url: str, access_token: str):
+    return httpx.request(
+        method,
+        url,
+        headers={"Authorization": f"Bearer {access_token}"},
+        timeout=5.0,
+    )
 
 
 def _parse_retry_after(response) -> int:
@@ -92,6 +117,43 @@ def _body_snippet(text: str) -> str:
     if len(text) <= BODY_SNIPPET_LIMIT:
         return text
     return f"{text[:BODY_SNIPPET_LIMIT]}..."
+
+
+def _log_control_failure(method: str, url: str, response):
+    if response.status_code < 300:
+        return
+    logging.warning(
+        "Playback control failed: %s %s -> %s %s",
+        method,
+        url,
+        response.status_code,
+        _body_snippet(response.text),
+    )
+
+
+def _should_retry_play_with_device(method: str, url: str, response) -> bool:
+    return (
+        method == "PUT"
+        and url == PLAY_URL
+        and response.status_code == 404
+        and "active device" in (response.text or "").lower()
+    )
+
+
+def _select_playback_device_id(devices: list[dict]) -> str | None:
+    eligible = [
+        device
+        for device in devices
+        if device.get("id") and not device.get("is_restricted", False)
+    ]
+    if not eligible:
+        return None
+    active = next((device for device in eligible if device.get("is_active")), None)
+    return (active or eligible[0])["id"]
+
+
+def _play_url(device_id: str) -> str:
+    return f"{PLAY_URL}?{urlencode({'device_id': device_id})}"
 
 
 class PlaybackController:

@@ -9,7 +9,10 @@ from src.spotify_worker import PlayerState
 def _make_app():
     config = MagicMock()
     config.refresh_token = "existing_refresh"
-    config.granted_scope = "user-read-currently-playing user-modify-playback-state"
+    config.granted_scope = (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
     widget = MagicMock()
 
     with (
@@ -358,11 +361,17 @@ def test_apply_token_result_saves_granted_scope():
             {
                 "access_token": "access",
                 "expires_in": 3600,
-                "scope": "user-read-currently-playing user-modify-playback-state",
+                "scope": (
+                    "user-read-currently-playing user-modify-playback-state "
+                    "user-read-playback-state"
+                ),
             }
         )
 
-    assert config.granted_scope == "user-read-currently-playing user-modify-playback-state"
+    assert config.granted_scope == (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
     config.save.assert_called_once()
 
 
@@ -379,7 +388,10 @@ def test_ensure_auth_reauths_when_scope_is_stale():
             return_value={
                 "access_token": "access",
                 "expires_in": 3600,
-                "scope": "user-read-currently-playing user-modify-playback-state",
+                "scope": (
+                    "user-read-currently-playing user-modify-playback-state "
+                    "user-read-playback-state"
+                ),
             },
         ) as oauth,
         patch("src.main.refresh_access_token") as refresh,
