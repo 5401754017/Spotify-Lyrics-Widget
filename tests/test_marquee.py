@@ -57,3 +57,48 @@ def test_marquee_tick_scrolls_by_pixel_offset(qtbot):
     label._tick()
 
     assert label._offset == MARQUEE_STEP_PX
+
+
+def test_start_marquee_uses_same_overflow_boundary_as_rest_elision(qtbot):
+    from PyQt6.QtCore import Qt
+    from PyQt6.QtGui import QFont
+
+    from src.fonts import app_font_family
+    from src.marquee import MarqueeLabel
+
+    label = MarqueeLabel()
+    qtbot.addWidget(label)
+    label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
+    label.setText("So Far Away - Acoustic — Adam Christopher")
+    boundary_width = label.fontMetrics().horizontalAdvance(label.text())
+    label.resize(boundary_width, 24)
+
+    assert (
+        label.fontMetrics().elidedText(
+            label.text(),
+            Qt.TextElideMode.ElideRight,
+            label.width(),
+        )
+        != label.text()
+    )
+
+    label.start_marquee()
+
+    assert label._timer.isActive()
+
+
+def test_marquee_wraps_forward_after_text_and_gap(qtbot):
+    from src.marquee import MARQUEE_GAP_PX, MARQUEE_STEP_PX, MarqueeLabel
+
+    label = MarqueeLabel()
+    qtbot.addWidget(label)
+    label.resize(80, 24)
+    label.setText("a very long title that cannot fit")
+    label.start_marquee()
+    cycle_width = label.fontMetrics().horizontalAdvance(label.text()) + MARQUEE_GAP_PX
+    label._offset = cycle_width - MARQUEE_STEP_PX
+
+    label._tick()
+
+    assert label._offset == 0
+    assert label._timer.isActive()
