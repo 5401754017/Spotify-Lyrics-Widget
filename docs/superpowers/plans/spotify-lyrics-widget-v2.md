@@ -8,13 +8,25 @@
 
 **Tech Stack:** Python 3.12, PyQt6, httpx, pytest, pytest-qt. No new third-party dependencies.
 
+**Completion status (2026-06-04):** Implemented and merged to `master`. Core V2 feature
+commits are `f63e398`, `1aa19ae`, `d85fe42`, `61ededb`, and `3f8c793`; final live-review
+polish continued through `48642bb`, `a7508f2`, and `3fc256b`. V2.01 follow-up patches are
+`f749fce` (clamp displayed lyric text to two visual lines) and `50ba487` (retry play on an
+available Spotify device after `NO_ACTIVE_DEVICE`). Full suite verification after V2.01:
+`205 passed` on 2026-06-04.
+
 **Revision note (2026-05-31 / renamed 2026-06-01):** This canonical V2 file contains the revised 2026-05-30 Claude x Codex plan. It replaced the old dated `2026-05-26-spotify-lyrics-widget-v2.md` path so future agents do not mistake the filename for an outdated plan. The previous 2026-05-26 content assumed fixed percentage top-row slots, predated V1.4/V1.5, and did not reflect the final user decisions: controls only appear on widget hover, individual button hover turns icons Spotify green, the center button uses play/pause glyphs, and lyrics stay Spotify green for V2.
 
 **Manual review adjustment (2026-06-03):** User review found that centered overlay controls visually cut through long title text. Final V2 geometry moves controls into a reserved right-side slot between the title/marquee area and the close button. The title still remains left-aligned and marquee-enabled on hover, but its paint area ends before the transport controls.
 
+**Final V2/V2.01 visual adjustment (2026-06-03 to 2026-06-04):** The play/pause control no
+longer has a circular backing. Previous, play/pause, and next are icon-only controls tuned
+to read as the same compact size family. The control cluster sits slightly higher than the
+lyric lane and below the close button's visual top, matching the user-approved layout.
+
 ---
 
-## Current Baseline
+## Historical Baseline
 
 - Branch baseline: `master` after V1.4/V1.5 merge, at V1.5 commit `60f380e`. The revised plan was drafted on `codex-v2-plan` at `3bba0dd`, folded into the dated V2 plan, then renamed to this stable canonical path.
 - Current widget: fixed `420x112`, dark opaque frameless window, DWM rounded corners and Spotify-green DWM border.
@@ -46,7 +58,8 @@ Final visual decision:
 - Top row stays dark, not green.
 - Title and transport icons are white by default.
 - Individual button hover turns the icon Spotify green.
-- Center play/pause button is a dark circle with a white icon by default; only the icon turns green on button hover.
+- Final implementation uses icon-only play/pause, no circular backing. Earlier dark-circle
+  center-button sketches were rejected during live review.
 - Lyrics stay Spotify green for V2. White lyrics are a later small visual tweak if desired.
 
 Rejected/parked alternatives:

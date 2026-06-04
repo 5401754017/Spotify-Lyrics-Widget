@@ -1,78 +1,132 @@
 # Spotify 歌詞懸浮視窗 — 開發交接文件
 
-最後更新：2026年5月
+最後更新：2026年6月4日
+
+目前版本：V2.01（`master` @ `50ba487`）
 
 ---
 
-## 為什麼做這個
+## 專案目的
 
-平常聽 Spotify 想看歌詞一定要打開 App 才能看，體驗很麻煩。想做一個常駐在桌面的懸浮小視窗，自動顯示當前播放歌曲的歌詞，音樂播到哪行只顯示哪行，減小佔據螢幕畫面，不用切換 App。
-
-這是一個自用工具，不需要市場驗證。開發週期短、失敗成本低，做完可以放 GitHub 當履歷作品。
+這是一個 Windows 自用 Spotify 歌詞懸浮視窗。目標是不用切回 Spotify App，也能在桌面最上層看到目前歌曲、同步歌詞、播放進度，並能用小型控制列操作上一首、播放/暫停、下一首。
 
 ---
 
-## 目標效果
+## 目前已完成
 
-- 任意位置有一個小懸浮視窗，永遠在最上層，可以自由拖曳
-- 顯示當前播放的歌名與歌手
-- 歌詞逐行顯示，播放到哪行就顯示那行
-- 風格走 Spotify 黑綠色調
-- 無邊框、乾淨、不干擾其他視窗
+- 固定 `420x112` 的 PyQt6 懸浮視窗，永遠在最上層，可拖曳
+- Windows 11 DWM 圓角與 Spotify 綠色系統邊框
+- Spotify OAuth PKCE 授權與 token refresh
+- 每秒 poll Spotify currently-playing，更新歌名、歌手、播放狀態、進度條
+- LRCLIB 作為主要同步歌詞來源
+- NetEase 作為 gated fallback：只在 LRCLIB 確認沒有同步歌詞時啟用
+- 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
+- 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
+- system tray：Show/Hide、Open log file、Quit
+- single-instance guard：重複開啟會聚焦既有視窗，不開第二個
+- `run.pyw` 無 console 啟動，錯誤寫入 log
+- V2 hover-only 播放控制：上一首、播放/暫停、下一首
+- 長歌名 hover marquee，未 hover 時 elide
+- V2.01 歌詞顯示最多兩個視覺行，過長時截斷為 `...`
+- V2.01 在 Spotify 已有可用 device 但 not playing 時，播放按鈕會嘗試指定 device 開始播放
+
+最新完整測試紀錄：`205 passed`（2026-06-04）
 
 ---
 
 ## 技術選型
 
-**語言：** Python
+**語言：** Python 3.12
 
 **GUI：** PyQt6
-- Windows 上做懸浮視窗最適合
-- 支援無邊框視窗、永遠在最上層、透明背景
-- 打包成 .exe 用 PyInstaller 一行搞定
 
-**API：**
-- Spotify Web API — `Get Currently Playing Track`，每秒 poll 一次，拿歌名、歌手、播放進度（毫秒）
-- lrclib.net — 開放 API，免費，提供 LRC 格式歌詞（每行有時間戳），用來做同步高亮
-- Genius API — fallback 用，當 lrclib 查不到時顯示純文字歌詞（無同步）
+**HTTP：** httpx
+
+**測試：** pytest、pytest-qt
+
+**文字處理：** zhconv（NetEase fallback 的簡繁比對與顯示）
+
+---
+
+## 外部 API
+
+- Spotify Web API
+  - `GET /v1/me/player/currently-playing`
+  - `PUT /v1/me/player/play`
+  - `PUT /v1/me/player/pause`
+  - `POST /v1/me/player/previous`
+  - `POST /v1/me/player/next`
+  - `GET /v1/me/player/devices`
+- LRCLIB
+  - 主要同步 LRC 歌詞來源
+  - timeout / non-200 / malformed JSON 視為暫時 unavailable
+- NetEase public endpoint
+  - 只在 LRCLIB confirmed miss 後 fallback
+  - 非官方來源，已有 cooldown 與 concrete logging
+
+目前沒有使用 Genius fallback。
+
+---
+
+## Spotify scopes
+
+目前需要：
+
+```text
+user-read-currently-playing
+user-modify-playback-state
+user-read-playback-state
+```
+
+如果本機 config 裡的 `granted_scope` 缺少新 scope，啟動時會重新走 Spotify 授權。
 
 ---
 
 ## 核心流程
 
-1. 啟動時引導使用者完成 Spotify OAuth 授權
-2. 每秒 poll Spotify API，拿到：歌名、歌手、播放進度（ms）、是否在播放
-3. 歌曲變換時，去 lrclib.net 查 LRC 歌詞
-4. 解析 LRC 時間戳，建立「時間 → 歌詞行」的對照表
-5. 每秒比對當前播放進度，找到對應行，高亮顯示
-6. 若 lrclib 查不到，fallback 去 Genius 查純文字歌詞，靜態顯示
+1. 啟動時確保只有單一 instance。
+2. 載入 `%APPDATA%/spotify-lyrics-widget/config.json`。
+3. 檢查 token 與 granted scopes，必要時 refresh 或重新 OAuth。
+4. 每秒 poll Spotify currently-playing。
+5. track ID 改變時清空舊歌詞，背景查 LRCLIB。
+6. LRCLIB confirmed miss 時，再查 NetEase fallback。
+7. UI tick 依照 Spotify progress 選出目前歌詞行。
+8. 顯示層把歌詞限制在最多兩個視覺行。
+9. hover 時顯示播放控制與長歌名 marquee。
+10. Quit 時停止 worker/thread，移除 tray icon。
 
 ---
 
-## 需要處理的細節
+## 重要路徑
 
-- **換歌偵測：** track ID 變了就清掉舊 LRC，重新查新歌
-- **暫停處理：** Spotify API 回傳 is_playing = false 時，視窗保持顯示但停止滾動
-- **Rate limit：** Spotify API poll 頻率每秒一次即可，不要更頻繁
-- **lrclib 查不到：** fallback 到 Genius，靜態顯示整段歌詞，不做同步
-- **視窗行為：** 可拖曳移動位置，可最小化，不影響其他視窗的點擊
-
----
-
-## 開發順序建議
-
-1. 先跑通 Spotify OAuth + 抓當前播放歌曲（CLI 印出來確認）
-2. 接 lrclib.net，確認可以查到 LRC 並正確解析時間戳
-3. 做最簡單的 PyQt6 視窗，先只顯示歌名
-4. 把歌詞塞進視窗，做逐行顯示
-5. 調整視覺風格（黑綠色、字體、無邊框）
-6. 加入 fallback 邏輯（lrclib 查無 → Genius）
-7. PyInstaller 打包成 .exe
+- Config：`%APPDATA%/spotify-lyrics-widget/config.json`
+- Log：`%APPDATA%/spotify-lyrics-widget/widget.log`
+- 入口：`run.pyw`
+- 主程式：`src/main.py`
+- UI：`src/widget.py`
+- 播放控制：`src/playback.py`
+- 歌詞 worker：`src/lyrics_worker.py`
+- LRCLIB parser：`src/lrc_parser.py`
+- NetEase fallback：`src/netease.py`
+- 歌詞兩行 clamp：`src/lyric_clamp.py`
 
 ---
 
-## 不在這次範圍內
+## 目前限制與 deferred
 
-- 歌詞翻譯功能（之後可擴充）
-- Mac / Linux 支援（目前只做 Windows）
-- 商業化（純自用 + 開源）
+- 尚未打包成 single `.exe`
+- 尚未做 first-run UX
+- 尚未做 playlist add / default playlist
+- 不做 startup-on-boot，除非重新驗證 single-instance 與 rate-limit brake
+- 不做 content-driven auto-resize，避免重現 UI 跳動
+- 不支援 Mac / Linux
+- 不做 Genius / Musixmatch / private Spotify cookie fallback
+- 歌詞翻譯與雙語顯示暫不做
+
+---
+
+## 建議下一步
+
+1. 用 `master` 做 V2.01 最後實機確認。
+2. 視需要補 Phase B 更詳細 log：device fallback start / selected device / retry success。
+3. 若主要功能穩定，再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。
