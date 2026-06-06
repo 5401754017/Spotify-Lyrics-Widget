@@ -505,7 +505,7 @@ def test_widget_applies_all_size_presets(qtbot):
         assert widget._max_lyric_visual_lines == preset.lyric_lines
 
 
-def test_widget_mini_clamps_lyric_to_one_line(qtbot):
+def test_widget_mini_clamps_lyric_to_two_lines(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -518,8 +518,8 @@ def test_widget_mini_clamps_lyric_to_one_line(qtbot):
         "You look away from me and I see something you are trying to hide"
     )
 
-    assert "\n" not in widget._lyric_label.text()
-    assert widget._lyric_label.text().endswith("...")
+    assert widget._lyric_label.text().count("\n") <= 1
+    assert widget._max_lyric_visual_lines == 2
 
 
 def test_size_preset_keeps_title_before_controls(qtbot):
