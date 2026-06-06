@@ -1,8 +1,8 @@
 # Spotify 歌詞懸浮視窗 — 開發交接文件
 
-最後更新：2026年6月4日
+最後更新：2026年6月6日
 
-目前版本：V2.01（`master` @ `50ba487`）
+目前版本：V2.02（LRCLIB unavailable → NetEase salvage patch）
 
 ---
 
@@ -19,7 +19,7 @@
 - Spotify OAuth PKCE 授權與 token refresh
 - 每秒 poll Spotify currently-playing，更新歌名、歌手、播放狀態、進度條
 - LRCLIB 作為主要同步歌詞來源
-- NetEase 作為 gated fallback：只在 LRCLIB 確認沒有同步歌詞時啟用
+- NetEase 作為 fallback：LRCLIB 確認沒有同步歌詞時啟用；LRCLIB 暫時不可用時也會補救查一次
 - 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
 - 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
 - system tray：Show/Hide、Open log file、Quit
@@ -29,8 +29,9 @@
 - 長歌名 hover marquee，未 hover 時 elide
 - V2.01 歌詞顯示最多兩個視覺行，過長時截斷為 `...`
 - V2.01 在 Spotify 已有可用 device 但 not playing 時，播放按鈕會嘗試指定 device 開始播放
+- V2.02 在 LRCLIB timeout / 暫時不可用時，NetEase 會補救查一次；若 NetEase 也沒找到，不會把這首歌記成永久無歌詞
 
-最新完整測試紀錄：`205 passed`（2026-06-04）
+最新完整測試紀錄：`206 passed`（2026-06-06）
 
 ---
 
@@ -61,7 +62,8 @@
   - 主要同步 LRC 歌詞來源
   - timeout / non-200 / malformed JSON 視為暫時 unavailable
 - NetEase public endpoint
-  - 只在 LRCLIB confirmed miss 後 fallback
+  - LRCLIB confirmed miss 後 fallback
+  - LRCLIB 暫時 unavailable 時也會補救查一次
   - 非官方來源，已有 cooldown 與 concrete logging
 
 目前沒有使用 Genius fallback。
@@ -90,10 +92,11 @@ user-read-playback-state
 4. 每秒 poll Spotify currently-playing。
 5. track ID 改變時清空舊歌詞，背景查 LRCLIB。
 6. LRCLIB confirmed miss 時，再查 NetEase fallback。
-7. UI tick 依照 Spotify progress 選出目前歌詞行。
-8. 顯示層把歌詞限制在最多兩個視覺行。
-9. hover 時顯示播放控制與長歌名 marquee。
-10. Quit 時停止 worker/thread，移除 tray icon。
+7. LRCLIB 暫時 unavailable 時，也會查 NetEase 補救一次。
+8. UI tick 依照 Spotify progress 選出目前歌詞行。
+9. 顯示層把歌詞限制在最多兩個視覺行。
+10. hover 時顯示播放控制與長歌名 marquee。
+11. Quit 時停止 worker/thread，移除 tray icon。
 
 ---
 
@@ -127,6 +130,6 @@ user-read-playback-state
 
 ## 建議下一步
 
-1. 用 `master` 做 V2.01 最後實機確認。
+1. 用 `master` 做 V2.02 最後實機確認。
 2. 視需要補 Phase B 更詳細 log：device fallback start / selected device / retry success。
 3. 若主要功能穩定，再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。

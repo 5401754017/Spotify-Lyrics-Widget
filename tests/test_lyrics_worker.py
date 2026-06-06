@@ -347,15 +347,31 @@ def test_netease_not_called_when_disabled(mock_lrclib, mock_netease, qtbot):
     assert misses == ["t1"]
 
 
-@patch("src.lyrics_worker.fetch_lyrics_from_netease")
+@patch("src.lyrics_worker.fetch_lyrics_from_netease", return_value=[(1000, "ne")])
 @patch("src.lyrics_worker.fetch_lyrics_from_lrclib", side_effect=LrclibUnavailableError("rl"))
-def test_lrclib_unavailable_does_not_call_netease(mock_lrclib, mock_netease, qtbot):
+def test_lrclib_unavailable_tries_netease_salvage(mock_lrclib, mock_netease, qtbot):
     worker = _pending_worker(netease_fallback=True)
-    unavailable = []
+    ready, unavailable = [], []
+    worker.lyrics_ready.connect(lambda tid, lyr: ready.append((tid, lyr)))
     worker.lyrics_unavailable.connect(lambda tid: unavailable.append(tid))
     worker.run()
-    mock_netease.assert_not_called()
+    mock_netease.assert_called_once_with("Song", "Artist", 180000)
+    assert ready == [("t1", [(1000, "ne")])]
+    assert unavailable == []
+    assert worker._cache.get("t1") == [(1000, "ne")]
+
+
+@patch("src.lyrics_worker.fetch_lyrics_from_netease", return_value=None)
+@patch("src.lyrics_worker.fetch_lyrics_from_lrclib", side_effect=LrclibUnavailableError("rl"))
+def test_lrclib_unavailable_netease_miss_does_not_cache_no_lyrics(mock_lrclib, mock_netease, qtbot):
+    worker = _pending_worker(netease_fallback=True)
+    unavailable, misses = [], []
+    worker.lyrics_unavailable.connect(lambda tid: unavailable.append(tid))
+    worker.no_lyrics.connect(lambda tid: misses.append(tid))
+    worker.run()
+    mock_netease.assert_called_once_with("Song", "Artist", 180000)
     assert unavailable == ["t1"]
+    assert misses == []
     assert worker._cache.get("t1") is worker._cache.MISS
 
 
@@ -392,8 +408,7 @@ def test_run_warns_on_lrclib_unavailable_with_concrete_reason(mock_lrclib, qtbot
     worker.run()
     warnings = [r for r in caplog.records if r.levelname == "WARNING"]
     infos = [r for r in caplog.records if r.levelname == "INFO"]
-    assert any("LRCLIB failed" in r.message and "Song" in r.message
-               and "LrclibUnavailableError" in r.message
+    assert any("LRCLIB unavailable" in r.message and "Song" in r.message
                and "search timeout" in r.message for r in warnings), \
         f"expected concrete LRCLIB-failure warning, got: {[r.message for r in warnings]}"
     assert any("lyrics_unavailable" in r.message and "t1" in r.message for r in infos)
