@@ -183,31 +183,25 @@ def test_start_creates_and_shows_tray():
         app.start()
 
     tray_class.assert_called_once_with(
-        on_activate=app.raise_window,
         on_toggle=app._toggle_widget,
-        on_open_log=app._open_log,
         on_quit=qapp.quit,
         on_size_changed=app._on_size_preset_changed,
         size_preset=config.size_preset,
     )
-    tray.set_widget_visible.assert_called_once_with(True)
     tray.show.assert_called_once()
 
 
 def test_toggle_widget_hides_when_visible():
     app, _, widget = _make_app()
-    app._tray = MagicMock()
     widget.isVisible.return_value = True
 
     app._toggle_widget()
 
     widget.hide.assert_called_once()
-    app._tray.set_widget_visible.assert_called_once_with(False)
 
 
 def test_toggle_widget_raises_when_hidden():
     app, _, widget = _make_app()
-    app._tray = MagicMock()
     widget.isVisible.return_value = False
 
     app._toggle_widget()
@@ -215,19 +209,6 @@ def test_toggle_widget_raises_when_hidden():
     widget.showNormal.assert_called_once()
     widget.raise_.assert_called_once()
     widget.activateWindow.assert_called_once()
-    app._tray.set_widget_visible.assert_called_once_with(True)
-
-
-def test_open_log_starts_log_file():
-    app, _, _ = _make_app()
-
-    with (
-        patch("src.main.log_file_path", return_value="LOGPATH"),
-        patch("src.main.os.startfile", create=True) as startfile,
-    ):
-        app._open_log()
-
-    startfile.assert_called_once_with("LOGPATH")
 
 
 def test_widget_close_request_quits_qapplication():

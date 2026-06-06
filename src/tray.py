@@ -28,22 +28,17 @@ def build_tray_icon() -> QIcon:
 class TrayIcon:
     def __init__(
         self,
-        on_activate,
         on_toggle,
-        on_open_log,
         on_quit,
         on_size_changed=None,
         size_preset: str = "current",
         parent=None,
     ):
-        self._on_activate = on_activate
+        self._on_toggle = on_toggle
         self._tray = QSystemTrayIcon(build_tray_icon(), parent)
         self._tray.setToolTip("Spotify Lyrics Widget")
 
         self._menu = QMenu()
-        self._toggle_action = self._menu.addAction("Hide widget")
-        self._toggle_action.triggered.connect(on_toggle)
-        self._menu.addAction("Open log file").triggered.connect(on_open_log)
 
         self._size_menu = self._menu.addMenu("Size")
         self._size_action_group = QActionGroup(self._size_menu)
@@ -67,10 +62,7 @@ class TrayIcon:
 
     def _on_tray_activated(self, reason):
         if reason == QSystemTrayIcon.ActivationReason.Trigger:
-            self._on_activate()
-
-    def set_widget_visible(self, visible: bool):
-        self._toggle_action.setText("Hide widget" if visible else "Show widget")
+            self._on_toggle()
 
     def set_size_preset(self, preset: str):
         if preset in self._size_actions:

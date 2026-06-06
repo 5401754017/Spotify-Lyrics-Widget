@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 import time
 
@@ -11,7 +10,7 @@ from src.auth import SCOPES, has_required_scopes, is_token_expired, refresh_acce
 from src.auth_server import run_oauth_flow
 from src.config import Config
 from src.fonts import load_app_font
-from src.logging_setup import configure_logging, log_file_path
+from src.logging_setup import configure_logging
 from src.lyrics_worker import LyricsWorker, TrackInfo
 from src.playback import PlaybackController
 from src.spotify_worker import PlayerState, SpotifyWorker
@@ -127,14 +126,11 @@ class App(QObject):
         self._widget.show()
         app = QApplication.instance()
         self._tray = TrayIcon(
-            on_activate=self.raise_window,
             on_toggle=self._toggle_widget,
-            on_open_log=self._open_log,
             on_quit=app.quit if app is not None else (lambda: None),
             on_size_changed=self._on_size_preset_changed,
             size_preset=self._config.size_preset,
         )
-        self._tray.set_widget_visible(True)
         self._tray.show()
         self._widget.start_ui_timer()
         self._spotify_worker.start()
@@ -280,15 +276,8 @@ class App(QObject):
     def _toggle_widget(self):
         if self._widget.isVisible():
             self._widget.hide()
-            if self._tray is not None:
-                self._tray.set_widget_visible(False)
         else:
             self.raise_window()
-            if self._tray is not None:
-                self._tray.set_widget_visible(True)
-
-    def _open_log(self):
-        os.startfile(log_file_path())
 
     @pyqtSlot(str, list)
     def _on_lyrics_ready(self, track_id: str, lyrics: list):
