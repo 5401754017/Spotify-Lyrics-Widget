@@ -15,6 +15,7 @@ class Config:
         "window_x": 100,
         "window_y": 100,
         "netease_fallback": True,
+        "size_preset": "current",
     }
 
     def __init__(self, config_dir: Path | None = None):
