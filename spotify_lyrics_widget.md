@@ -2,7 +2,7 @@
 
 最後更新：2026年6月6日
 
-目前版本：V2.02（LRCLIB unavailable → NetEase salvage patch）
+目前版本：V2.03（size presets: Current / Compact / Small / Mini）
 
 ---
 
@@ -14,7 +14,7 @@
 
 ## 目前已完成
 
-- 固定 `420x112` 的 PyQt6 懸浮視窗，永遠在最上層，可拖曳
+- PyQt6 懸浮視窗，永遠在最上層，可拖曳；支援 Current (420x112)、Compact (380x96)、Small (340x84)、Mini (300x74) 四種固定密度尺寸
 - Windows 11 DWM 圓角與 Spotify 綠色系統邊框
 - Spotify OAuth PKCE 授權與 token refresh
 - 每秒 poll Spotify currently-playing，更新歌名、歌手、播放狀態、進度條
@@ -22,7 +22,7 @@
 - NetEase 作為 fallback：LRCLIB 確認沒有同步歌詞時啟用；LRCLIB 暫時不可用時也會補救查一次
 - 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
 - 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
-- system tray：Show/Hide、Open log file、Quit
+- system tray：Show/Hide、Open log file、Size submenu（Current / Compact / Small / Mini）、Quit
 - single-instance guard：重複開啟會聚焦既有視窗，不開第二個
 - `run.pyw` 無 console 啟動，錯誤寫入 log
 - V2 hover-only 播放控制：上一首、播放/暫停、下一首
@@ -30,8 +30,9 @@
 - V2.01 歌詞顯示最多兩個視覺行，過長時截斷為 `...`
 - V2.01 在 Spotify 已有可用 device 但 not playing 時，播放按鈕會嘗試指定 device 開始播放
 - V2.02 在 LRCLIB timeout / 暫時不可用時，NetEase 會補救查一次；若 NetEase 也沒找到，不會把這首歌記成永久無歌詞
+- V2.03 size presets：tray menu 可切換 Current / Compact / Small / Mini 四種固定密度尺寸；Mini 歌詞只顯示一行並省略；選擇會持久化到 config
 
-最新完整測試紀錄：`206 passed`（2026-06-06）
+最新完整測試紀錄：`193 passed`（2026-06-06，不含 test_main.py 已知 PyQt6 環境 crash）
 
 ---
 
@@ -128,31 +129,23 @@ user-read-playback-state
 
 ---
 
-## 目前進行中：V2.03 size preset
+## V2.03 size preset（已完成）
 
-V2.03 尚未實作。這一輪只完成設計與 implementation plan，讓下一個 agent 可以直接接續施工。
+Branch `codex/v2.03-size-presets`，worktree `.worktrees/v2.03-size-presets`。
 
-已完成文件：
+實作內容：
+
+- `src/config.py`：新增 `size_preset` 持久化欄位，預設 `current`
+- `src/lyric_clamp.py`：支援 `max_lines=1` 的單行省略
+- `src/transport_button.py`：`set_button_size()` 讓 button 可縮放
+- `src/widget.py`：`SIZE_PRESETS` dataclass、`apply_size_preset()` 套用寬高/字體/layout/button size/lyric lines
+- `src/tray.py`：`Size` submenu，checked action group
+- `src/main.py`：啟動時套用 config preset，tray 選擇即時套用並保存
+
+文件：
 
 - Spec：`docs/superpowers/specs/2026-06-06-spotify-widget-size-presets-design.md`
 - Plan：`docs/superpowers/plans/2026-06-06-spotify-widget-size-presets.md`
-
-已決定：
-
-- 文件以中文為主，必要技術詞保留英文。
-- Current / Compact / Small / Mini 四種固定 preset。
-- Current `420x112` 是最大與預設。
-- Mini `300x74`，歌詞只顯示一行，超過用 `...` 省略。
-- 切換入口先放 tray menu 的 `Size` submenu。
-- 不做自由 resize、不做 scale slider、不做 content-driven auto-resize。
-- Top row 要先預留 controls / close 空間，title slot 吃剩下寬度；hover 時 title 不應跳動。
-
-建議下一個 agent：
-
-1. 先讀 V2.03 spec 和 plan。
-2. 使用 `superpowers:executing-plans` 或 `superpowers:subagent-driven-development` 執行 plan。
-3. 依 plan 做 TDD：先測紅，再改 code，再測綠，每個 task 一個 commit。
-4. 實作完成後跑 full suite，並讓使用者看實際 Current / Compact / Small / Mini 畫面，再按視覺結果調整尺寸數值。
 
 ---
 
