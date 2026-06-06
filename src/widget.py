@@ -1,9 +1,10 @@
 import ctypes
+from dataclasses import dataclass
 import logging
 import sys
 import time
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, QSize, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QCloseEvent,
@@ -46,6 +47,148 @@ CLOSE_SLOT_WIDTH = 28
 TOP_ROW_RIGHT_RESERVE = CONTROLS_CLUSTER_WIDTH + CONTROLS_CLOSE_GAP + CLOSE_SLOT_WIDTH
 CORNER_RADIUS = 12
 
+
+@dataclass(frozen=True)
+class WidgetSizePreset:
+    name: str
+    width: int
+    height: int
+    top_padding: int
+    top_row_height: int
+    gap_after_top: int
+    lyric_lane_height: int
+    gap_after_lyric: int
+    progress_height: int
+    bottom_padding: int
+    left_margin: int
+    title_width: int
+    title_control_gap: int
+    controls_width: int
+    controls_height: int
+    controls_close_gap: int
+    close_width: int
+    close_height: int
+    right_margin: int
+    title_font_pt: int
+    lyric_font_pt: int
+    lyric_lines: int
+    button_size: QSize
+    controls_spacing: int
+    close_font_px: int
+
+
+SIZE_PRESETS = {
+    "current": WidgetSizePreset(
+        "current",
+        420,
+        112,
+        12,
+        24,
+        5,
+        56,
+        5,
+        2,
+        8,
+        16,
+        282,
+        14,
+        66,
+        24,
+        12,
+        20,
+        20,
+        10,
+        10,
+        16,
+        2,
+        QSize(18, 24),
+        6,
+        14,
+    ),
+    "compact": WidgetSizePreset(
+        "compact",
+        380,
+        96,
+        9,
+        22,
+        4,
+        49,
+        4,
+        2,
+        6,
+        14,
+        250,
+        12,
+        66,
+        24,
+        10,
+        20,
+        20,
+        8,
+        10,
+        14,
+        2,
+        QSize(18, 24),
+        6,
+        14,
+    ),
+    "small": WidgetSizePreset(
+        "small",
+        340,
+        84,
+        7,
+        20,
+        3,
+        46,
+        3,
+        1,
+        5,
+        12,
+        224,
+        10,
+        58,
+        22,
+        8,
+        18,
+        18,
+        10,
+        9,
+        12,
+        2,
+        QSize(16, 22),
+        5,
+        12,
+    ),
+    "mini": WidgetSizePreset(
+        "mini",
+        300,
+        74,
+        6,
+        18,
+        2,
+        41,
+        2,
+        1,
+        4,
+        10,
+        198,
+        8,
+        56,
+        22,
+        6,
+        18,
+        18,
+        6,
+        8,
+        10,
+        1,
+        QSize(16, 22),
+        4,
+        12,
+    ),
+}
+DEFAULT_SIZE_PRESET = "current"
+
 # Windows 11 DWM rounded-corner experiment (DwmSetWindowAttribute)
 _DWMWA_WINDOW_CORNER_PREFERENCE = 33
 _DWMWCP_ROUND = 2
@@ -64,6 +207,8 @@ class LyricsWidget(QWidget):
 
     def __init__(self):
         super().__init__()
+        self._size_preset_name = DEFAULT_SIZE_PRESET
+        self._max_lyric_visual_lines = SIZE_PRESETS[DEFAULT_SIZE_PRESET].lyric_lines
         self._setup_window()
         self._setup_ui()
         self._setup_timer()
@@ -137,17 +282,17 @@ class LyricsWidget(QWidget):
             f"#lyricsPanel {{ background-color: {PANEL_BACKGROUND}; }}"
         )
 
-        layout = QVBoxLayout(self._panel)
-        layout.setContentsMargins(16, 12, 16, 8)
-        layout.setSpacing(5)
+        self._panel_layout = QVBoxLayout(self._panel)
+        self._panel_layout.setContentsMargins(16, 12, 16, 8)
+        self._panel_layout.setSpacing(5)
         outer_layout.addWidget(self._panel)
         self.setLayout(outer_layout)
 
         self._top_row = QWidget(self._panel)
         self._top_row.setFixedHeight(TOP_ROW_HEIGHT)
-        top_row = QHBoxLayout(self._top_row)
-        top_row.setContentsMargins(0, 0, TOP_ROW_RIGHT_RESERVE, 0)
-        top_row.setSpacing(0)
+        self._top_row_layout = QHBoxLayout(self._top_row)
+        self._top_row_layout.setContentsMargins(0, 0, TOP_ROW_RIGHT_RESERVE, 0)
+        self._top_row_layout.setSpacing(0)
         self._track_label = MarqueeLabel("")
         self._track_label.setFont(QFont(app_font_family(), 10, QFont.Weight.DemiBold))
         self._track_label.setStyleSheet(f"color: {WHITE};")
@@ -157,7 +302,7 @@ class LyricsWidget(QWidget):
         self._track_label.setAlignment(
             Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter
         )
-        top_row.addWidget(self._track_label, stretch=1)
+        self._top_row_layout.addWidget(self._track_label, stretch=1)
 
         self._close_btn = QPushButton("✕", self._panel)
         self._close_btn.setFixedSize(20, 20)
@@ -167,23 +312,23 @@ class LyricsWidget(QWidget):
         )
         self._close_btn.clicked.connect(self.close)
         self._close_btn.setVisible(False)
-        layout.addWidget(self._top_row)
+        self._panel_layout.addWidget(self._top_row)
 
         self._controls_cluster = QWidget(self._panel)
         self._controls_cluster.setFixedSize(
             CONTROLS_CLUSTER_WIDTH, CONTROLS_CLUSTER_HEIGHT
         )
         self._controls_cluster.setMouseTracking(True)
-        controls_layout = QHBoxLayout(self._controls_cluster)
-        controls_layout.setContentsMargins(0, 0, 0, 0)
-        controls_layout.setSpacing(6)
+        self._controls_layout = QHBoxLayout(self._controls_cluster)
+        self._controls_layout.setContentsMargins(0, 0, 0, 0)
+        self._controls_layout.setSpacing(6)
 
         self._prev_btn = TransportButton("previous", self._controls_cluster)
         self._play_pause_btn = TransportButton("play", self._controls_cluster)
         self._next_btn = TransportButton("next", self._controls_cluster)
-        controls_layout.addWidget(self._prev_btn)
-        controls_layout.addWidget(self._play_pause_btn)
-        controls_layout.addWidget(self._next_btn)
+        self._controls_layout.addWidget(self._prev_btn)
+        self._controls_layout.addWidget(self._play_pause_btn)
+        self._controls_layout.addWidget(self._next_btn)
 
         self._prev_btn.clicked.connect(self.prev_clicked)
         self._play_pause_btn.clicked.connect(self.play_pause_clicked)
@@ -196,7 +341,7 @@ class LyricsWidget(QWidget):
         self._lyric_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._lyric_label.setWordWrap(True)
         self._lyric_label.setFixedHeight(LYRIC_LANE_HEIGHT)
-        layout.addWidget(self._lyric_label)
+        self._panel_layout.addWidget(self._lyric_label)
 
         self._progress_bar = QProgressBar()
         self._progress_bar.setFixedHeight(2)
@@ -207,13 +352,60 @@ class LyricsWidget(QWidget):
             f"QProgressBar {{ background-color: {DARK_GRAY}; border: none; }}"
             f"QProgressBar::chunk {{ background-color: {SPOTIFY_GREEN}; }}"
         )
-        layout.addWidget(self._progress_bar)
-        self._position_overlay_controls()
+        self._panel_layout.addWidget(self._progress_bar)
+        self.apply_size_preset(DEFAULT_SIZE_PRESET)
 
     def _setup_timer(self):
         self._ui_timer = QTimer(self)
         self._ui_timer.setInterval(UI_TIMER_INTERVAL_MS)
         self._ui_timer.timeout.connect(self._on_ui_tick)
+
+    @property
+    def size_preset(self) -> str:
+        return self._size_preset_name
+
+    def apply_size_preset(self, name: str):
+        preset = SIZE_PRESETS.get(name, SIZE_PRESETS[DEFAULT_SIZE_PRESET])
+        self._size_preset_name = preset.name
+        self._max_lyric_visual_lines = preset.lyric_lines
+
+        self.setFixedSize(preset.width, preset.height)
+        self._panel_layout.setContentsMargins(
+            preset.left_margin,
+            preset.top_padding,
+            preset.right_margin,
+            preset.bottom_padding,
+        )
+        self._panel_layout.setSpacing(preset.gap_after_top)
+        self._top_row.setFixedHeight(preset.top_row_height)
+
+        top_row_right_reserve = (
+            preset.title_control_gap
+            + preset.controls_width
+            + preset.controls_close_gap
+            + preset.close_width
+        )
+        self._top_row_layout.setContentsMargins(0, 0, top_row_right_reserve, 0)
+
+        self._track_label.setFont(
+            QFont(app_font_family(), preset.title_font_pt, QFont.Weight.DemiBold)
+        )
+        self._lyric_label.setFont(
+            QFont(app_font_family(), preset.lyric_font_pt, QFont.Weight.Bold)
+        )
+        self._lyric_label.setFixedHeight(preset.lyric_lane_height)
+        self._progress_bar.setFixedHeight(preset.progress_height)
+        self._controls_cluster.setFixedSize(preset.controls_width, preset.controls_height)
+        self._controls_layout.setSpacing(preset.controls_spacing)
+        for button in (self._prev_btn, self._play_pause_btn, self._next_btn):
+            button.set_button_size(preset.button_size)
+        self._close_btn.setFixedSize(preset.close_width, preset.close_height)
+        self._close_btn.setStyleSheet(
+            f"QPushButton {{ color: {WHITE}; background: transparent; border: none; font-size: {preset.close_font_px}px; }}"
+            f"QPushButton:hover {{ color: {SPOTIFY_GREEN}; }}"
+        )
+        self._position_overlay_controls()
+        self.set_lyric_text(self._lyric_label.text())
 
     def start_ui_timer(self):
         self._ui_timer.start()
@@ -231,7 +423,12 @@ class LyricsWidget(QWidget):
 
     def set_lyric_text(self, text: str):
         width = max(self._lyric_label.width(), self.width() - 32, 1)
-        text = clamp_lyric_text(text, self._lyric_label.font(), width)
+        text = clamp_lyric_text(
+            text,
+            self._lyric_label.font(),
+            width,
+            max_lines=self._max_lyric_visual_lines,
+        )
         self._lyric_label.setText(text)
 
     def set_duration(self, duration_ms: int):
@@ -283,14 +480,18 @@ class LyricsWidget(QWidget):
             self._lyric_label.setText("")
 
     def _position_overlay_controls(self):
-        if hasattr(self, "_close_btn"):
-            panel_width = max(self._panel.width(), self.width())
-            close_x = panel_width - 30
-            self._close_btn.move(close_x, 8)
-            self._controls_cluster.move(
-                close_x - CONTROLS_CLOSE_GAP - CONTROLS_CLUSTER_WIDTH,
-                self._top_row.y(),
-            )
+        if not hasattr(self, "_close_btn"):
+            return
+
+        preset = SIZE_PRESETS.get(
+            self._size_preset_name,
+            SIZE_PRESETS[DEFAULT_SIZE_PRESET],
+        )
+        controls_x = preset.left_margin + preset.title_width + preset.title_control_gap
+        close_x = controls_x + preset.controls_width + preset.controls_close_gap
+        y = preset.top_padding
+        self._controls_cluster.move(controls_x, y)
+        self._close_btn.move(close_x, y)
 
     def set_playing(self, is_playing: bool):
         self._play_pause_btn.set_mode("pause" if is_playing else "play")
