@@ -479,15 +479,21 @@ def test_hover_starts_and_stops_title_marquee(qtbot):
     assert widget._track_label._offset == 0
 
 
-def test_widget_defaults_to_current_size_preset(qtbot):
+def test_widget_defaults_to_large_size_preset(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
-    assert widget.size_preset == "current"
+    assert widget.size_preset == "large"
     assert widget.size().width() == 420
     assert widget.size().height() == 112
+
+
+def test_widget_has_three_size_presets(qtbot):
+    from src.widget import SIZE_PRESETS
+
+    assert list(SIZE_PRESETS) == ["small", "medium", "large"]
 
 
 def test_widget_applies_all_size_presets(qtbot):
@@ -496,21 +502,29 @@ def test_widget_applies_all_size_presets(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
+    expected_sizes = {
+        "small": (300, 74, 8, 10, 2),
+        "medium": (360, 90, 9, 13, 2),
+        "large": (420, 112, 10, 16, 2),
+    }
+
     for name, preset in SIZE_PRESETS.items():
         widget.apply_size_preset(name)
-        assert widget.size().width() == preset.width
-        assert widget.size().height() == preset.height
-        assert widget._track_label.font().pointSize() == preset.title_font_pt
-        assert widget._lyric_label.font().pointSize() == preset.lyric_font_pt
-        assert widget._max_lyric_visual_lines == preset.lyric_lines
+        width, height, title_pt, lyric_pt, lyric_lines = expected_sizes[name]
+        assert (preset.width, preset.height) == (width, height)
+        assert widget.size().width() == width
+        assert widget.size().height() == height
+        assert widget._track_label.font().pointSize() == title_pt
+        assert widget._lyric_label.font().pointSize() == lyric_pt
+        assert widget._max_lyric_visual_lines == lyric_lines
 
 
-def test_widget_mini_clamps_lyric_to_two_lines(qtbot):
+def test_widget_small_clamps_lyric_to_two_lines(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
     qtbot.addWidget(widget)
-    widget.apply_size_preset("mini")
+    widget.apply_size_preset("small")
     widget.show()
     qtbot.waitExposed(widget)
 
