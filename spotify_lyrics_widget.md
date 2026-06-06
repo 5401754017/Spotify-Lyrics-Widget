@@ -22,7 +22,7 @@
 - NetEase 作為 fallback：LRCLIB 確認沒有同步歌詞時啟用；LRCLIB 暫時不可用時也會補救查一次
 - 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
 - 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
-- system tray：Show/Hide、Open log file、Size submenu（Current / Compact / Small / Mini）、Quit
+- system tray：左鍵 toggle widget 顯示/隱藏，右鍵 menu 有 Size submenu（Current / Compact / Small / Mini）和 Quit
 - single-instance guard：重複開啟會聚焦既有視窗，不開第二個
 - `run.pyw` 無 console 啟動，錯誤寫入 log
 - V2 hover-only 播放控制：上一首、播放/暫停、下一首
@@ -30,7 +30,9 @@
 - V2.01 歌詞顯示最多兩個視覺行，過長時截斷為 `...`
 - V2.01 在 Spotify 已有可用 device 但 not playing 時，播放按鈕會嘗試指定 device 開始播放
 - V2.02 在 LRCLIB timeout / 暫時不可用時，NetEase 會補救查一次；若 NetEase 也沒找到，不會把這首歌記成永久無歌詞
-- V2.03 size presets：tray menu 可切換 Current / Compact / Small / Mini 四種固定密度尺寸；Mini 歌詞只顯示一行並省略；選擇會持久化到 config
+- V2.03 size presets：tray menu 可切換 Current / Compact / Small / Mini 四種固定密度尺寸；所有 preset 歌詞顯示兩行；選擇會持久化到 config
+- V2.03 tray 精簡：移除 Show/Hide 和 Open log file，左鍵點 tray icon 直接 toggle widget 顯示/隱藏
+- V2.03 optimistic play/pause：點擊播放/暫停按鈕後立刻翻轉 icon 狀態，不等 API 回應
 
 最新完整測試紀錄：`193 passed`（2026-06-06，不含 test_main.py 已知 PyQt6 環境 crash）
 
