@@ -397,13 +397,15 @@ def test_connect_signals_wires_playback_controls():
 
 
 def test_play_pause_click_uses_latest_play_state():
-    app, _, _ = _make_app()
+    app, _, widget = _make_app()
     app._playback = MagicMock()
     app._is_playing = True
 
     app._on_play_pause_clicked()
 
     app._playback.toggle.assert_called_once_with(True)
+    assert app._is_playing is False
+    widget.set_playing.assert_called_with(False)
 
 
 def test_state_sync_updates_widget_playing_icon():

@@ -241,6 +241,8 @@ class App(QObject):
     @pyqtSlot()
     def _on_play_pause_clicked(self):
         self._playback.toggle(self._is_playing)
+        self._is_playing = not self._is_playing
+        self._widget.set_playing(self._is_playing)
 
     @pyqtSlot()
     def _on_not_a_track(self):
