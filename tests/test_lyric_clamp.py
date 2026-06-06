@@ -42,3 +42,26 @@ def test_long_unspaced_lyric_text_clamps_without_wrapping_again(qtbot):
     assert len(lines) == 2
     assert lines[1].endswith("...")
     assert all(metrics.horizontalAdvance(line) <= width for line in lines)
+
+
+def test_clamp_lyric_text_one_visual_line_elides(qtbot):
+    from src.lyric_clamp import clamp_lyric_text
+
+    text = "You look away from me and I see something you are trying to hide"
+    width = 120
+
+    clamped = clamp_lyric_text(text, _font(), width, max_lines=1)
+
+    assert "\n" not in clamped
+    assert clamped.endswith("...")
+    assert QFontMetrics(_font()).horizontalAdvance(clamped) <= width
+
+
+def test_clamp_lyric_text_one_explicit_line_only(qtbot):
+    from src.lyric_clamp import clamp_lyric_text
+
+    text = "first line\nsecond line"
+
+    clamped = clamp_lyric_text(text, _font(), 300, max_lines=1)
+
+    assert clamped == "first line"
