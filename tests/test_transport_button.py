@@ -20,6 +20,17 @@ def test_transport_button_fixed_sizes(qtbot):
     assert next_button.size() == QSize(18, 24)
 
 
+def test_transport_button_can_apply_smaller_size(qtbot):
+    from src.transport_button import TransportButton
+
+    button = TransportButton("play")
+    qtbot.addWidget(button)
+
+    button.set_button_size(QSize(16, 22))
+
+    assert button.size() == QSize(16, 22)
+
+
 def test_play_pause_button_has_no_circle_background(qtbot):
     from src.transport_button import TransportButton
 

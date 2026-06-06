@@ -5,7 +5,8 @@ from PyQt6.QtWidgets import QPushButton
 
 WHITE = "#FFFFFF"
 SPOTIFY_GREEN = "#1DB954"
-BUTTON_SIZE = QSize(18, 24)
+BASE_BUTTON_SIZE = QSize(18, 24)
+BUTTON_SIZE = BASE_BUTTON_SIZE
 
 
 class TransportButton(QPushButton):
@@ -22,18 +23,28 @@ class TransportButton(QPushButton):
         self.setMouseTracking(True)
         self.setFlat(True)
         self.setStyleSheet("background: transparent; border: none;")
-        self.setFixedSize(BUTTON_SIZE)
+        self._button_size = BASE_BUTTON_SIZE
+        self.setFixedSize(self._button_size)
 
     def set_mode(self, mode: str):
         if mode not in {"previous", "play", "pause", "next"}:
             raise ValueError(f"Unknown transport button mode: {mode}")
         self.mode = mode
-        self.setFixedSize(BUTTON_SIZE)
+        self.setFixedSize(self._button_size)
+        self.update()
+
+    def set_button_size(self, size: QSize):
+        self._button_size = size
+        self.setFixedSize(size)
         self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.scale(
+            max(1, self.width()) / BASE_BUTTON_SIZE.width(),
+            max(1, self.height()) / BASE_BUTTON_SIZE.height(),
+        )
         icon_color = QColor(SPOTIFY_GREEN if self._hovered else WHITE)
 
         painter.setBrush(icon_color)
