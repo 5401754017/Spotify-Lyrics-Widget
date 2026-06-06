@@ -128,8 +128,36 @@ user-read-playback-state
 
 ---
 
+## 目前進行中：V2.03 size preset
+
+V2.03 尚未實作。這一輪只完成設計與 implementation plan，讓下一個 agent 可以直接接續施工。
+
+已完成文件：
+
+- Spec：`docs/superpowers/specs/2026-06-06-spotify-widget-size-presets-design.md`
+- Plan：`docs/superpowers/plans/2026-06-06-spotify-widget-size-presets.md`
+
+已決定：
+
+- 文件以中文為主，必要技術詞保留英文。
+- Current / Compact / Small / Mini 四種固定 preset。
+- Current `420x112` 是最大與預設。
+- Mini `300x74`，歌詞只顯示一行，超過用 `...` 省略。
+- 切換入口先放 tray menu 的 `Size` submenu。
+- 不做自由 resize、不做 scale slider、不做 content-driven auto-resize。
+- Top row 要先預留 controls / close 空間，title slot 吃剩下寬度；hover 時 title 不應跳動。
+
+建議下一個 agent：
+
+1. 先讀 V2.03 spec 和 plan。
+2. 使用 `superpowers:executing-plans` 或 `superpowers:subagent-driven-development` 執行 plan。
+3. 依 plan 做 TDD：先測紅，再改 code，再測綠，每個 task 一個 commit。
+4. 實作完成後跑 full suite，並讓使用者看實際 Current / Compact / Small / Mini 畫面，再按視覺結果調整尺寸數值。
+
+---
+
 ## 建議下一步
 
-1. 用 `master` 做 V2.02 最後實機確認。
-2. 視需要補 Phase B 更詳細 log：device fallback start / selected device / retry success。
-3. 若主要功能穩定，再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。
+1. 接續 V2.03 size preset implementation plan。
+2. 實作完成後做實機視覺 review，必要時調整 preset 尺寸。
+3. V2.03 穩定後再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。
