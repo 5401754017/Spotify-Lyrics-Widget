@@ -1,12 +1,16 @@
 # Spotify Widget Three Size Presets Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** 把 V2.03 的 Current / Compact / Small / Mini 四段尺寸收斂成 Small / Medium / Large 三段尺寸。
 
 **Architecture:** `src/widget.py` 直接把 preset table 重排成 Small / Medium / Large。`src/config.py` 只做簡單 alias normalization：`mini -> small`、`compact -> medium`、`current -> large`；`small` 保持 `small`，不保留 V2.03 舊 Small 的語意。`src/tray.py` 只顯示 Small / Medium / Large；`src/main.py` 維持既有 callback/save wiring，但測試要改成新 preset values。
 
 **Tech Stack:** Python 3.12, PyQt6, pytest, pytest-qt.
+
+**Implementation result (2026-06-07):** Completed on branch `codex/v2.04-three-size-presets`.
+Focused suite `86 passed`; full suite `223 passed`. Next step is visual review of actual
+Small / Medium / Large screenshots, then adjust profile numbers only if needed.
 
 ---
 
@@ -40,7 +44,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04 -q <args>
 - Modify: `src/config.py`
 - Test: `tests/test_config.py`
 
-- [ ] **Step 1: Add failing config tests**
+- [x] **Step 1: Add failing config tests**
 
 In `tests/test_config.py`, add `import pytest` near the top if it is not present.
 
@@ -89,7 +93,7 @@ def test_existing_small_value_is_treated_as_new_small(tmp_path):
     assert config.size_preset == "small"
 ```
 
-- [ ] **Step 2: Run config tests red**
+- [x] **Step 2: Run config tests red**
 
 Run:
 
@@ -99,7 +103,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_config -q test
 
 Expected: FAIL because default is still `current` and aliases do not exist.
 
-- [ ] **Step 3: Implement config normalization**
+- [x] **Step 3: Implement config normalization**
 
 In `src/config.py`, add constants above `class Config`:
 
@@ -136,7 +140,7 @@ In `_load()`, after the existing loop, set normalized values:
 
 Keep `save()` unchanged.
 
-- [ ] **Step 4: Run config tests green**
+- [x] **Step 4: Run config tests green**
 
 Run:
 
@@ -146,7 +150,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_config -q test
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 1**
+- [x] **Step 5: Commit Task 1**
 
 ```powershell
 git add src/config.py tests/test_config.py
@@ -163,7 +167,7 @@ git commit -m "feat: normalize three widget size presets"
 - Modify: `src/widget.py`
 - Test: `tests/test_widget.py`
 
-- [ ] **Step 1: Update widget tests first**
+- [x] **Step 1: Update widget tests first**
 
 In `tests/test_widget.py`, update size preset tests to expect:
 
@@ -228,7 +232,7 @@ def test_widget_small_clamps_lyric_to_two_lines(qtbot):
     assert widget._max_lyric_visual_lines == 2
 ```
 
-- [ ] **Step 2: Run widget tests red**
+- [x] **Step 2: Run widget tests red**
 
 Run:
 
@@ -238,7 +242,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_widget -q test
 
 Expected: FAIL because widget still has `current / compact / small / mini`.
 
-- [ ] **Step 3: Update `SIZE_PRESETS`**
+- [x] **Step 3: Update `SIZE_PRESETS`**
 
 In `src/widget.py`, replace `SIZE_PRESETS` with:
 
@@ -263,7 +267,7 @@ SIZE_PRESETS = {
 DEFAULT_SIZE_PRESET = "large"
 ```
 
-- [ ] **Step 4: Run widget focused suite green**
+- [x] **Step 4: Run widget focused suite green**
 
 Run:
 
@@ -273,7 +277,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_widget -q test
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 2**
+- [x] **Step 5: Commit Task 2**
 
 ```powershell
 git add src/widget.py tests/test_widget.py
@@ -290,7 +294,7 @@ git commit -m "feat: collapse widget size presets to three"
 - Modify: `src/tray.py`
 - Test: `tests/test_tray.py`
 
-- [ ] **Step 1: Update tray tests first**
+- [x] **Step 1: Update tray tests first**
 
 In `tests/test_tray.py`, update defaults and expectations:
 
@@ -339,7 +343,7 @@ def test_size_action_calls_callback(qtbot):
     assert calls == ["small"]
 ```
 
-- [ ] **Step 2: Run tray tests red**
+- [x] **Step 2: Run tray tests red**
 
 Run:
 
@@ -349,7 +353,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_tray -q tests/
 
 Expected: FAIL because tray still shows Current / Compact / Small / Mini.
 
-- [ ] **Step 3: Update tray actions**
+- [x] **Step 3: Update tray actions**
 
 In `src/tray.py`, replace `SIZE_ACTIONS` with:
 
@@ -367,7 +371,7 @@ Update `TrayIcon.__init__` default:
         size_preset: str = "large",
 ```
 
-- [ ] **Step 4: Run tray tests green**
+- [x] **Step 4: Run tray tests green**
 
 Run:
 
@@ -377,7 +381,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_tray -q tests/
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit Task 3**
+- [x] **Step 5: Commit Task 3**
 
 ```powershell
 git add src/tray.py tests/test_tray.py
@@ -393,7 +397,7 @@ git commit -m "feat: show three size presets in tray"
 **Files:**
 - Modify: `tests/test_main.py`
 
-- [ ] **Step 1: Update main tests**
+- [x] **Step 1: Update main tests**
 
 In `tests/test_main.py`:
 
@@ -409,7 +413,7 @@ assert config.size_preset == "small"
 app._tray.set_size_preset.assert_called_once_with("small")
 ```
 
-- [ ] **Step 2: Run main focused tests**
+- [x] **Step 2: Run main focused tests**
 
 Run:
 
@@ -419,7 +423,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_main -q tests/
 
 Expected: PASS. If this fails because production code writes a removed preset value, fix `src/main.py` to use `self._widget.size_preset` after `apply_size_preset()`.
 
-- [ ] **Step 3: Commit Task 4**
+- [x] **Step 3: Commit Task 4**
 
 ```powershell
 git add tests/test_main.py src/main.py
@@ -436,7 +440,7 @@ git commit -m "test: use new size preset names"
 - Modify: `spotify_lyrics_widget.md`
 - Modify: `docs/superpowers/plans/2026-05-25-roadmap.md`
 
-- [ ] **Step 1: Run focused suite**
+- [x] **Step 1: Run focused suite**
 
 Run:
 
@@ -446,7 +450,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_focus -q tests
 
 Expected: PASS.
 
-- [ ] **Step 2: Run full suite**
+- [x] **Step 2: Run full suite**
 
 Run:
 
@@ -456,7 +460,7 @@ python -m pytest -p no:cacheprovider --basetemp=.pytest_tmp_v2_04_full -q
 
 Expected: all tests PASS.
 
-- [ ] **Step 3: Update handoff**
+- [x] **Step 3: Update handoff**
 
 In `spotify_lyrics_widget.md`, update:
 
@@ -468,7 +472,7 @@ In `spotify_lyrics_widget.md`, update:
   - Spec: `docs/superpowers/specs/2026-06-07-spotify-widget-three-size-presets-design.md`
   - Plan: `docs/superpowers/plans/2026-06-07-spotify-widget-three-size-presets.md`
 
-- [ ] **Step 4: Update roadmap**
+- [x] **Step 4: Update roadmap**
 
 In `docs/superpowers/plans/2026-05-25-roadmap.md`, add V2.04 under Current state and roadmap table:
 
@@ -485,7 +489,7 @@ Roadmap row:
 | **V2.04** | Three size presets. Size menu now shows Small, Medium, and Large. Removed V2.03 config keys use simple aliases; `small` stays the new Small. |
 ```
 
-- [ ] **Step 5: Commit Task 5**
+- [x] **Step 5: Commit Task 5**
 
 ```powershell
 git add spotify_lyrics_widget.md docs/superpowers/plans/2026-05-25-roadmap.md
