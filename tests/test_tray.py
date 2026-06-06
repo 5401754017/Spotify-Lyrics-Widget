@@ -9,7 +9,12 @@ def _noop():
 
 def _make_tray(**overrides):
     callbacks = dict(
-        on_activate=_noop, on_toggle=_noop, on_open_log=_noop, on_quit=_noop
+        on_activate=_noop,
+        on_toggle=_noop,
+        on_open_log=_noop,
+        on_quit=_noop,
+        on_size_changed=_noop,
+        size_preset="current",
     )
     callbacks.update(overrides)
     return TrayIcon(**callbacks)
@@ -46,3 +51,28 @@ def test_set_widget_visible_updates_toggle_label(qtbot):
     assert tray._toggle_action.text() == "Hide widget"
     tray.set_widget_visible(False)
     assert tray._toggle_action.text() == "Show widget"
+
+
+def test_menu_has_size_submenu_with_presets(qtbot):
+    tray = _make_tray(on_size_changed=lambda name: None, size_preset="small")
+
+    size_actions = [
+        action for action in tray._menu.actions()
+        if action.menu() is not None and action.text() == "Size"
+    ]
+    assert len(size_actions) == 1
+
+    labels = [action.text() for action in tray._size_menu.actions()]
+    assert labels == ["Current", "Compact", "Small", "Mini"]
+    checked = [action.text() for action in tray._size_menu.actions() if action.isChecked()]
+    assert checked == ["Small"]
+
+
+def test_size_action_calls_callback(qtbot):
+    calls = []
+    tray = _make_tray(on_size_changed=lambda name: calls.append(name))
+
+    mini_action = next(action for action in tray._size_menu.actions() if action.text() == "Mini")
+    mini_action.trigger()
+
+    assert calls == ["mini"]

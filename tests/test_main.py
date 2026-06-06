@@ -187,6 +187,8 @@ def test_start_creates_and_shows_tray():
         on_toggle=app._toggle_widget,
         on_open_log=app._open_log,
         on_quit=qapp.quit,
+        on_size_changed=app._on_size_preset_changed,
+        size_preset=config.size_preset,
     )
     tray.set_widget_visible.assert_called_once_with(True)
     tray.show.assert_called_once()
@@ -430,3 +432,60 @@ def test_state_sync_updates_widget_playing_icon():
 
     assert app._is_playing is True
     widget.set_playing.assert_called_once_with(True)
+
+
+# ---- V2.03 size presets ----
+
+
+def test_app_applies_config_size_preset_on_init():
+    config = MagicMock()
+    config.refresh_token = "existing_refresh"
+    config.granted_scope = (
+        "user-read-currently-playing user-modify-playback-state "
+        "user-read-playback-state"
+    )
+    config.size_preset = "mini"
+    widget = MagicMock()
+
+    with (
+        patch("src.main.Config", return_value=config),
+        patch("src.main.LyricsWidget", return_value=widget),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock()),
+    ):
+        App()
+
+    widget.apply_size_preset.assert_called_once_with("mini")
+
+
+def test_start_creates_tray_with_size_preset():
+    app, config, _ = _make_app()
+    config.client_id = "client"
+    config.size_preset = "small"
+    app._ensure_auth = MagicMock(return_value=True)
+    qapp = MagicMock()
+
+    with (
+        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.TrayIcon") as tray_class,
+    ):
+        app.start()
+
+    tray_class.assert_called_once()
+    assert tray_class.call_args.kwargs["size_preset"] == "small"
+    assert tray_class.call_args.kwargs["on_size_changed"] == app._on_size_preset_changed
+
+
+def test_size_preset_change_updates_widget_and_config():
+    app, config, widget = _make_app()
+    app._tray = MagicMock()
+    widget.apply_size_preset.reset_mock()
+    config.save.reset_mock()
+    widget.size_preset = "mini"
+
+    app._on_size_preset_changed("mini")
+
+    widget.apply_size_preset.assert_called_once_with("mini")
+    assert config.size_preset == "mini"
+    config.save.assert_called_once()
+    app._tray.set_size_preset.assert_called_once_with("mini")

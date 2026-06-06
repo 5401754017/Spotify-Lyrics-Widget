@@ -98,6 +98,7 @@ class App(QObject):
         self._tray: TrayIcon | None = None
         self._last_heartbeat_ts: float = 0.0
         self._is_playing = False
+        self._widget.apply_size_preset(self._config.size_preset)
         self._connect_lifecycle_signals()
 
     def _connect_lifecycle_signals(self):
@@ -130,6 +131,8 @@ class App(QObject):
             on_toggle=self._toggle_widget,
             on_open_log=self._open_log,
             on_quit=app.quit if app is not None else (lambda: None),
+            on_size_changed=self._on_size_preset_changed,
+            size_preset=self._config.size_preset,
         )
         self._tray.set_widget_visible(True)
         self._tray.show()
@@ -262,6 +265,13 @@ class App(QObject):
             self._connect_signals()
             self._spotify_worker.start()
 
+    def _on_size_preset_changed(self, preset: str):
+        self._widget.apply_size_preset(preset)
+        self._config.size_preset = self._widget.size_preset
+        self._config.save()
+        if self._tray is not None:
+            self._tray.set_size_preset(self._widget.size_preset)
+
     def raise_window(self):
         self._widget.showNormal()
         self._widget.raise_()
@@ -306,6 +316,7 @@ class App(QObject):
         config = Config(config_dir=self._config.config_dir)
         config.window_x = position.x()
         config.window_y = position.y()
+        config.size_preset = self._config.size_preset
         config.save()
         self._spotify_worker.stop()
         self._spotify_worker.wait(2000)

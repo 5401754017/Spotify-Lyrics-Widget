@@ -76,3 +76,19 @@ def test_granted_scope_defaults_to_empty_string(tmp_path):
     config = Config(tmp_path)
 
     assert config.granted_scope == ""
+
+
+def test_size_preset_defaults_to_current(tmp_path):
+    config = Config(config_dir=tmp_path)
+
+    assert config.size_preset == "current"
+
+
+def test_size_preset_persists(tmp_path):
+    config = Config(config_dir=tmp_path)
+    config.size_preset = "mini"
+    config.save()
+
+    config2 = Config(config_dir=tmp_path)
+
+    assert config2.size_preset == "mini"

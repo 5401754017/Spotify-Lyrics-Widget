@@ -477,3 +477,68 @@ def test_hover_starts_and_stops_title_marquee(qtbot):
     widget._on_leave_hover()
     assert not widget._track_label._timer.isActive()
     assert widget._track_label._offset == 0
+
+
+def test_widget_defaults_to_current_size_preset(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    assert widget.size_preset == "current"
+    assert widget.size().width() == 420
+    assert widget.size().height() == 112
+
+
+def test_widget_applies_all_size_presets(qtbot):
+    from src.widget import SIZE_PRESETS, LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    for name, preset in SIZE_PRESETS.items():
+        widget.apply_size_preset(name)
+        assert widget.size().width() == preset.width
+        assert widget.size().height() == preset.height
+        assert widget._track_label.font().pointSize() == preset.title_font_pt
+        assert widget._lyric_label.font().pointSize() == preset.lyric_font_pt
+        assert widget._max_lyric_visual_lines == preset.lyric_lines
+
+
+def test_widget_mini_clamps_lyric_to_one_line(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.apply_size_preset("mini")
+    widget.show()
+    qtbot.waitExposed(widget)
+
+    widget.set_lyric_text(
+        "You look away from me and I see something you are trying to hide"
+    )
+
+    assert "\n" not in widget._lyric_label.text()
+    assert widget._lyric_label.text().endswith("...")
+
+
+def test_size_preset_keeps_title_before_controls(qtbot):
+    from src.widget import SIZE_PRESETS, LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+
+    for name in SIZE_PRESETS:
+        widget.apply_size_preset(name)
+        widget._on_enter_hover()
+        title_right = widget._track_label.mapTo(
+            widget._panel,
+            widget._track_label.rect().topRight(),
+        ).x()
+        assert title_right < widget._controls_cluster.geometry().left()
+        assert (
+            widget._controls_cluster.geometry().right()
+            < widget._close_btn.geometry().left()
+        )

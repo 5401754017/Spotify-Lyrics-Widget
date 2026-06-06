@@ -22,6 +22,9 @@ def clamp_lyric_text(
     if len(visual_lines) <= max_lines:
         return text
 
+    if max_lines == 1:
+        return _elide_ascii(text.replace("\n", " "), QFontMetrics(font), width)
+
     first_line = visual_lines[0]
     remaining_text = " ".join(line for line in visual_lines[1:] if line)
     second_line = _elide_ascii(remaining_text, QFontMetrics(font), width)
