@@ -1,8 +1,10 @@
 # Spotify 歌詞懸浮視窗 — 開發交接文件
 
-最後更新：2026年6月6日
+最後更新：2026年6月7日
 
 目前版本：V2.03（size presets: Current / Compact / Small / Mini）
+
+下一步版本：V2.04（三段 size presets: Small / Medium / Large，尚未實作）
 
 ---
 
@@ -34,7 +36,7 @@
 - V2.03 tray 精簡：移除 Show/Hide 和 Open log file，左鍵點 tray icon 直接 toggle widget 顯示/隱藏
 - V2.03 optimistic play/pause：點擊播放/暫停按鈕後立刻翻轉 icon 狀態，不等 API 回應
 
-最新完整測試紀錄：`193 passed`（2026-06-06，不含 test_main.py 已知 PyQt6 環境 crash）
+最新完整測試紀錄：`218 passed`（2026-06-07）
 
 ---
 
@@ -151,8 +153,31 @@ Branch `codex/v2.03-size-presets`，worktree `.worktrees/v2.03-size-presets`。
 
 ---
 
+## V2.04 three size presets（文件已完成，尚未實作）
+
+V2.03 實機觀察後，四段尺寸過細，且 Compact / Small 的間距不像同一套均勻階梯。V2.04 決定收斂成三段：
+
+- Small：原 Mini，`300x74`
+- Medium：原 Compact / Small 合併，`360x90`
+- Large：原 Current，`420x112`，也是預設
+
+Config 允許值會改成 `small / medium / large`，不新增額外 config 版本欄位。V2.04 直接重排 preset table；舊 config 裡已存在的 `small` 會被當成 V2.04 新 Small。移除的舊 key 用簡單 alias：
+
+- `mini` → `small`
+- `compact` → `medium`
+- `current` → `large`
+
+文件：
+
+- Spec：`docs/superpowers/specs/2026-06-07-spotify-widget-three-size-presets-design.md`
+- Plan：`docs/superpowers/plans/2026-06-07-spotify-widget-three-size-presets.md`
+
+下一個 agent 要照 V2.04 plan 用 TDD 實作，完成後讓使用者看實際 Small / Medium / Large 三種畫面，再視覺調整尺寸。
+
+---
+
 ## 建議下一步
 
-1. 接續 V2.03 size preset implementation plan。
-2. 實作完成後做實機視覺 review，必要時調整 preset 尺寸。
-3. V2.03 穩定後再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。
+1. 接續 V2.04 three size presets implementation plan。
+2. 實作完成後做實機視覺 review，必要時調整 Small / Medium / Large 尺寸。
+3. V2.04 穩定後再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。
