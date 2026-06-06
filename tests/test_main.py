@@ -427,7 +427,7 @@ def test_app_applies_config_size_preset_on_init():
         "user-read-currently-playing user-modify-playback-state "
         "user-read-playback-state"
     )
-    config.size_preset = "mini"
+    config.size_preset = "small"
     widget = MagicMock()
 
     with (
@@ -438,13 +438,13 @@ def test_app_applies_config_size_preset_on_init():
     ):
         App()
 
-    widget.apply_size_preset.assert_called_once_with("mini")
+    widget.apply_size_preset.assert_called_once_with("small")
 
 
 def test_start_creates_tray_with_size_preset():
     app, config, _ = _make_app()
     config.client_id = "client"
-    config.size_preset = "small"
+    config.size_preset = "medium"
     app._ensure_auth = MagicMock(return_value=True)
     qapp = MagicMock()
 
@@ -455,7 +455,7 @@ def test_start_creates_tray_with_size_preset():
         app.start()
 
     tray_class.assert_called_once()
-    assert tray_class.call_args.kwargs["size_preset"] == "small"
+    assert tray_class.call_args.kwargs["size_preset"] == "medium"
     assert tray_class.call_args.kwargs["on_size_changed"] == app._on_size_preset_changed
 
 
@@ -464,11 +464,11 @@ def test_size_preset_change_updates_widget_and_config():
     app._tray = MagicMock()
     widget.apply_size_preset.reset_mock()
     config.save.reset_mock()
-    widget.size_preset = "mini"
+    widget.size_preset = "small"
 
-    app._on_size_preset_changed("mini")
+    app._on_size_preset_changed("small")
 
-    widget.apply_size_preset.assert_called_once_with("mini")
-    assert config.size_preset == "mini"
+    widget.apply_size_preset.assert_called_once_with("small")
+    assert config.size_preset == "small"
     config.save.assert_called_once()
-    app._tray.set_size_preset.assert_called_once_with("mini")
+    app._tray.set_size_preset.assert_called_once_with("small")
