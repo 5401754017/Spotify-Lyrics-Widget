@@ -49,6 +49,33 @@ UI 不應該計算任意中間尺寸。程式只套用其中一個 profile，然
 
 Mini 模式使用一行 lyric clamp。如果歌詞放不下，就用 `...` 省略。Current、Compact、Small 保留目前最多兩個 visual lines 的歌詞行為。
 
+## Top Row 水平配置
+
+寬度變小時，top row 的規則是：
+
+```text
+| left margin | title slot | controls slot | close slot | right margin |
+```
+
+優先順序：
+
+1. `controls slot` 和 `close slot` 要穩定。
+2. `title slot` 吃剩下的寬度。
+3. title 太長時，在 `title slot` 內 elide；hover 時只在 `title slot` 內 marquee。
+
+Controls 即使未 hover，也要在 layout 上預留空間。這樣 hover 顯示 previous / play-pause / next / close 時，title 不會突然縮短或跳動。
+
+各 preset 的 top row 應該依照這個方向縮小：
+
+| Preset | Title slot | Controls / close |
+| --- | --- | --- |
+| Current | 最寬，接近目前行為 | 目前尺寸 |
+| Compact | title slot 變短 | controls 大小可維持或小幅縮小 |
+| Small | title slot 再變短 | controls 小幅縮小 |
+| Mini | title slot 最短，主要靠 elide / marquee | controls 保持可點擊，不追求等比縮到很小 |
+
+Mini 模式的取捨是：保留播放控制可用性，犧牲 title 顯示長度。也就是 Mini 下長歌名更容易被省略，但 hover marquee 仍可看完整歌名。
+
 ## 切換方式
 
 在現有 tray menu 裡新增 `Size` submenu：
