@@ -3,6 +3,14 @@ import os
 from pathlib import Path
 
 
+SIZE_PRESET_VALUES = {"small", "medium", "large"}
+SIZE_PRESET_ALIASES = {
+    "mini": "small",
+    "compact": "medium",
+    "current": "large",
+}
+
+
 class Config:
     """Manages persistent config in %APPDATA%/spotify-lyrics-widget/config.json."""
 
@@ -15,7 +23,7 @@ class Config:
         "window_x": 100,
         "window_y": 100,
         "netease_fallback": True,
-        "size_preset": "current",
+        "size_preset": "large",
     }
 
     def __init__(self, config_dir: Path | None = None):
@@ -38,6 +46,13 @@ class Config:
 
         for key, default in self._DEFAULTS.items():
             setattr(self, key, data.get(key, default))
+        self.size_preset = self._normalize_size_preset(data)
+
+    def _normalize_size_preset(self, data: dict) -> str:
+        raw_value = data.get("size_preset", self._DEFAULTS["size_preset"])
+        if raw_value in SIZE_PRESET_VALUES:
+            return raw_value
+        return SIZE_PRESET_ALIASES.get(raw_value, "large")
 
     def save(self):
         self._config_dir.mkdir(parents=True, exist_ok=True)

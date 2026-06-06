@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from src.config import Config
 
 
@@ -78,17 +80,43 @@ def test_granted_scope_defaults_to_empty_string(tmp_path):
     assert config.granted_scope == ""
 
 
-def test_size_preset_defaults_to_current(tmp_path):
+def test_size_preset_defaults_to_large(tmp_path):
     config = Config(config_dir=tmp_path)
 
-    assert config.size_preset == "current"
+    assert config.size_preset == "large"
 
 
-def test_size_preset_persists(tmp_path):
+def test_size_preset_persists_new_small_value(tmp_path):
     config = Config(config_dir=tmp_path)
-    config.size_preset = "mini"
+    config.size_preset = "small"
     config.save()
 
     config2 = Config(config_dir=tmp_path)
 
-    assert config2.size_preset == "mini"
+    assert config2.size_preset == "small"
+
+
+@pytest.mark.parametrize(
+    ("removed_value", "expected"),
+    [
+        ("mini", "small"),
+        ("compact", "medium"),
+        ("current", "large"),
+    ],
+)
+def test_removed_size_preset_values_use_simple_alias(tmp_path, removed_value, expected):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"size_preset": removed_value}))
+
+    config = Config(config_dir=tmp_path)
+
+    assert config.size_preset == expected
+
+
+def test_existing_small_value_is_treated_as_new_small(tmp_path):
+    config_file = tmp_path / "config.json"
+    config_file.write_text(json.dumps({"size_preset": "small"}))
+
+    config = Config(config_dir=tmp_path)
+
+    assert config.size_preset == "small"
