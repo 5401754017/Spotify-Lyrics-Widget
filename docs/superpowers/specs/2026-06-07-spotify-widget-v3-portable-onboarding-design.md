@@ -1,92 +1,92 @@
-# Spotify Widget V3 Portable Onboarding Design
+# Spotify Widget V3 Portable Onboarding 設計
 
-## Current Decision
+## 目前決策
 
-V3 should make the app easy for public users to try without knowing Python. The release target is an installer-free portable zip that contains an executable. Users download, unzip, and run `SpotifyLyricsWidget.exe`.
+V3 的目標是讓公開使用者不用懂 Python 也能試用。發佈形式先做成免安裝的 portable zip，裡面包含可執行檔。使用者下載、解壓縮，然後執行 `SpotifyLyricsWidget.exe`。
 
-"Portable" in V3 means no Python installation and no command-line setup. It does not mean every user setting must live next to the executable. Config and logs should remain under `%APPDATA%/spotify-lyrics-widget/` so they survive app folder replacement during updates.
+V3 這裡說的「portable」是指不用安裝 Python、不用打指令。它不是指所有設定檔都一定要放在 exe 旁邊。設定和 log 先保留在 `%APPDATA%/spotify-lyrics-widget/`，這樣使用者之後替換新版 app 資料夾時，原本的 token 和偏好設定不會被洗掉。
 
-## Public Spotify Constraint
+## Spotify 公開使用限制
 
-For a public release, the app should not depend on sharing the developer's own Spotify `client_id`.
+公開發佈時，app 不應該依賴開發者自己的 Spotify `client_id` 給所有人共用。
 
-Spotify Development Mode is limited and requires users to be allowlisted. Extended quota mode is the route for wider public use, but the current Spotify requirements make that unrealistic for this project at this stage. V3 therefore uses a first-run onboarding dialog that helps each user create their own Spotify app and paste their own `client_id`.
+Spotify Development Mode 有限制，而且使用者需要被加入 allowlist。Extended quota mode 才是大量公開使用的正式路線，但 Spotify 目前的申請條件對這個專案來說不實際。因此 V3 先做 first-run onboarding dialog，引導每個使用者建立自己的 Spotify app，然後貼上自己的 `client_id`。
 
-Relevant official docs:
+相關官方文件：
 
 - Spotify apps: `https://developer.spotify.com/documentation/web-api/concepts/apps`
 - Quota modes: `https://developer.spotify.com/documentation/web-api/concepts/quota-modes`
 - Redirect URI rules: `https://developer.spotify.com/documentation/web-api/concepts/redirect_uri`
 
-## User Experience
+## 使用者體驗
 
-First run should show a real PyQt dialog instead of the current plain text input prompt.
+第一次啟動時，應該顯示真正的 PyQt 設定視窗，取代目前單純的文字輸入框。
 
-The dialog should be simple and action-oriented:
+設定視窗要簡單、直接、以操作為主：
 
 ```text
 +------------------------------------------------+
-| Spotify Setup                                  |
+| Spotify 初始設定                              |
 +------------------------------------------------+
-| 1. Open Spotify Developer Dashboard            |
-|    [Open Dashboard]                            |
+| 1. 開啟 Spotify Developer Dashboard            |
+|    [開啟 Dashboard]                            |
 |                                                |
-| 2. Add this Redirect URI to your Spotify app   |
+| 2. 把這個 Redirect URI 加到 Spotify app        |
 |    http://127.0.0.1:8888/callback              |
-|    [Copy Redirect URI]                         |
+|    [複製 Redirect URI]                         |
 |                                                |
-| 3. Paste your Client ID                        |
+| 3. 貼上你的 Client ID                          |
 |    [____________________________]              |
 |                                                |
-|              [Cancel] [Connect Spotify]        |
+|              [取消] [連接 Spotify]             |
 +------------------------------------------------+
 ```
 
-The dialog should not try to automate Spotify account setup. It should open the Dashboard on demand, copy the redirect URI on demand, validate that a non-empty Client ID was entered, save it to config, then continue into the existing OAuth flow.
+這個視窗不負責自動建立 Spotify 帳號或 Spotify app。它只提供必要輔助：按鈕開啟 Dashboard、按鈕複製 redirect URI、檢查 Client ID 不是空白、存進 config，然後接到現有 OAuth 流程。
 
-The wording should assume the user is not a developer, but it should avoid long tutorial text inside the app. The release zip can include a short `README.md` as a fallback.
+文案要假設使用者不是工程師，但不要把很長的教學塞進 app 裡。release zip 可以附一份短版 `README.md` 當備用說明。
 
-## Architecture
+## 架構
 
-Add a small first-run setup dialog module and keep the existing auth flow.
+新增一個小型 first-run setup dialog module，保留現有 auth flow。
 
-Proposed components:
+預計元件：
 
-- `src/onboarding.py`: PyQt dialog for first-run setup.
-- `src/main.py`: replace the current `QInputDialog.getText(...)` path with the onboarding dialog.
-- `src/config.py`: keep current `%APPDATA%` config behavior.
-- `README.md`: short fallback guide copied into the release zip.
-- Packaging files: PyInstaller spec and build script for a one-folder portable zip.
+- `src/onboarding.py`：PyQt 初始設定視窗。
+- `src/main.py`：把目前 `QInputDialog.getText(...)` 那段改成 onboarding dialog。
+- `src/config.py`：保留目前 `%APPDATA%` 的 config 行為。
+- `README.md`：短版備用教學，release zip 會附上。
+- 打包檔案：PyInstaller spec 和 build script，用來產生 one-folder portable zip。
 
-No new auth protocol is needed. The app already uses PKCE and `http://127.0.0.1:8888/callback`, which matches Spotify's loopback redirect guidance.
+不需要新增 auth protocol。app 目前已經使用 PKCE 和 `http://127.0.0.1:8888/callback`，符合 Spotify 對 loopback redirect 的建議。
 
-## Data Flow
+## 資料流程
 
 ```text
-User opens exe
+使用者打開 exe
   |
-Config loads from %APPDATA%/spotify-lyrics-widget/config.json
+從 %APPDATA%/spotify-lyrics-widget/config.json 載入 config
   |
-client_id missing?
+缺少 client_id？
   |
-Yes -> show onboarding dialog
+是 -> 顯示 onboarding dialog
   |
-User opens dashboard, copies redirect URI, pastes Client ID
+使用者開啟 dashboard、複製 redirect URI、貼上 Client ID
   |
-Dialog saves client_id through Config.save()
+dialog 透過 Config.save() 儲存 client_id
   |
-Existing OAuth flow starts
+進入現有 OAuth flow
   |
-Tokens and preferences stay in %APPDATA%
+token 和偏好設定留在 %APPDATA%
 ```
 
-When `client_id` already exists, startup should skip onboarding and behave like the current app.
+如果 `client_id` 已經存在，啟動時就跳過 onboarding，行為和目前 app 一樣。
 
-## Packaging
+## 打包
 
-Use PyInstaller one-folder output first. This is less fragile for PyQt6 than a single-file executable and is easier to debug when assets or Qt plugins are missing.
+先使用 PyInstaller 的 one-folder 輸出。這對 PyQt6 來說比單一 exe 穩，也比較容易在 asset 或 Qt plugin 缺漏時 debug。
 
-Release shape:
+Release 結構：
 
 ```text
 SpotifyLyricsWidget-v3-portable/
@@ -95,46 +95,46 @@ SpotifyLyricsWidget-v3-portable/
   README.md
 ```
 
-The dashboard button should open `https://developer.spotify.com/dashboard`.
+Dashboard 按鈕應該開啟 `https://developer.spotify.com/dashboard`。
 
-The build must include:
+Build 必須包含：
 
-- PyQt6 runtime and Qt plugins.
-- `assets/fonts/NotoSansTC-VF.ttf`.
-- Existing source package under `src`.
-- No console window for normal app launch.
+- PyQt6 runtime 和 Qt plugins。
+- `assets/fonts/NotoSansTC-VF.ttf`。
+- 目前 `src` 底下的 source package。
+- 一般啟動時不要顯示 console 視窗。
 
-The generated `dist/` and release zip are build artifacts and should stay out of git.
+產生出來的 `dist/` 和 release zip 是 build artifacts，不應該進 git。
 
-## Testing
+## 測試
 
-Add focused tests before implementation:
+實作前先補聚焦測試：
 
-- Missing `client_id` opens onboarding instead of `QInputDialog`.
-- Accepted onboarding saves the Client ID and continues startup.
-- Cancelled onboarding exits without starting workers.
-- Existing `client_id` skips onboarding.
-- Redirect URI text in onboarding matches `src.auth.REDIRECT_URI`.
-- Packaging command can produce a one-folder build.
+- 缺少 `client_id` 時，開 onboarding，而不是 `QInputDialog`。
+- onboarding 按下接受後，會儲存 Client ID 並繼續啟動。
+- onboarding 按取消後，會退出，不啟動 workers。
+- 已有 `client_id` 時，跳過 onboarding。
+- onboarding 裡顯示的 Redirect URI 要和 `src.auth.REDIRECT_URI` 一致。
+- 打包指令能產生 one-folder build。
 
-Manual smoke test for the final portable build:
+最終 portable build 的手動 smoke test：
 
-1. Build the portable folder.
-2. Run the exe from a clean config directory.
-3. Verify onboarding appears.
-4. Verify Open Dashboard opens the Spotify dashboard.
-5. Verify Copy Redirect URI copies `http://127.0.0.1:8888/callback`.
-6. Paste a Client ID and finish OAuth.
-7. Confirm tray, lyrics, size menu, logging, and clean shutdown still work.
-8. Replace the app folder with a rebuilt one and confirm config persists.
+1. 建立 portable folder。
+2. 從乾淨 config directory 執行 exe。
+3. 確認 onboarding 有出現。
+4. 確認「開啟 Dashboard」會開啟 Spotify dashboard。
+5. 確認「複製 Redirect URI」會複製 `http://127.0.0.1:8888/callback`。
+6. 貼上 Client ID 並完成 OAuth。
+7. 確認 tray、歌詞、尺寸選單、logging、乾淨關閉都還能運作。
+8. 用重新 build 的 app folder 取代舊 app folder，確認 config 仍然保留。
 
-## Deferred
+## 暫緩項目
 
-- Full data-portable mode where config/log live beside the exe.
-- Single-file PyInstaller executable.
-- Code signing.
-- Installer/MSIX.
-- Shared project-owned Spotify Client ID with extended quota.
-- Rich multi-page wizard with screenshots.
+- 完整 data-portable mode，也就是 config/log 跟 exe 放在一起。
+- 單一檔案 PyInstaller executable。
+- Code signing。
+- Installer/MSIX。
+- 專案自己持有、且已通過 extended quota 的 Spotify Client ID。
+- 有截圖、多頁流程的完整 wizard。
 
-These are intentionally deferred because the first public usability gap is Python-free launch plus clear Spotify setup guidance.
+這些先刻意暫緩，因為第一個公開使用門檻是不用 Python 啟動，以及清楚引導使用者完成 Spotify 設定。
