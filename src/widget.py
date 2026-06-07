@@ -342,7 +342,6 @@ class LyricsWidget(QWidget):
         self._size_preset_name = preset.name
         self._max_lyric_visual_lines = preset.lyric_lines
 
-        self.setFixedSize(preset.width, preset.height)
         self._panel_layout.setContentsMargins(
             preset.left_margin,
             preset.top_padding,
@@ -379,6 +378,7 @@ class LyricsWidget(QWidget):
         )
         self._panel_layout.activate()
         self._top_row_layout.activate()
+        self.setFixedSize(preset.width, preset.height)
         self._position_overlay_controls()
         self.set_lyric_text(self._lyric_label.text())
 

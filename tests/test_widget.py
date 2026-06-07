@@ -519,6 +519,31 @@ def test_widget_applies_all_size_presets(qtbot):
         assert widget._max_lyric_visual_lines == lyric_lines
 
 
+def test_widget_locks_small_size_after_layout_activation(qtbot, monkeypatch):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+
+    widget.apply_size_preset("large")
+    qtbot.wait(0)
+
+    original_activate = widget._panel_layout.activate
+
+    def activate_with_stale_height():
+        result = original_activate()
+        widget.setFixedSize(300, 113)
+        return result
+
+    monkeypatch.setattr(widget._panel_layout, "activate", activate_with_stale_height)
+    widget.apply_size_preset("small")
+
+    assert widget.size().width() == 300
+    assert widget.size().height() == 74
+
+
 def test_widget_small_clamps_lyric_to_two_lines(qtbot):
     from src.widget import LyricsWidget
 
