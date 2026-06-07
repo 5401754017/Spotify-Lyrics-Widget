@@ -6,10 +6,9 @@ from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 SPOTIFY_GREEN = "#1DB954"
 
 SIZE_ACTIONS = [
-    ("Current", "current"),
-    ("Compact", "compact"),
     ("Small", "small"),
-    ("Mini", "mini"),
+    ("Medium", "medium"),
+    ("Large", "large"),
 ]
 
 
@@ -31,7 +30,7 @@ class TrayIcon:
         on_toggle,
         on_quit,
         on_size_changed=None,
-        size_preset: str = "current",
+        size_preset: str = "large",
         parent=None,
     ):
         self._on_toggle = on_toggle

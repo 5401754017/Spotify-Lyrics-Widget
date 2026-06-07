@@ -12,7 +12,7 @@ def _make_tray(**overrides):
         on_toggle=_noop,
         on_quit=_noop,
         on_size_changed=_noop,
-        size_preset="current",
+        size_preset="large",
     )
     callbacks.update(overrides)
     return TrayIcon(**callbacks)
@@ -55,7 +55,7 @@ def test_menu_has_size_submenu_with_presets(qtbot):
     assert len(size_actions) == 1
 
     labels = [action.text() for action in tray._size_menu.actions()]
-    assert labels == ["Current", "Compact", "Small", "Mini"]
+    assert labels == ["Small", "Medium", "Large"]
     checked = [action.text() for action in tray._size_menu.actions() if action.isChecked()]
     assert checked == ["Small"]
 
@@ -64,7 +64,9 @@ def test_size_action_calls_callback(qtbot):
     calls = []
     tray = _make_tray(on_size_changed=lambda name: calls.append(name))
 
-    mini_action = next(action for action in tray._size_menu.actions() if action.text() == "Mini")
-    mini_action.trigger()
+    medium_action = next(
+        action for action in tray._size_menu.actions() if action.text() == "Medium"
+    )
+    medium_action.trigger()
 
-    assert calls == ["mini"]
+    assert calls == ["medium"]

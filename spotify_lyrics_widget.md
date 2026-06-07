@@ -2,9 +2,9 @@
 
 最後更新：2026年6月7日
 
-目前版本：V2.03（size presets: Current / Compact / Small / Mini）
+目前實作版本：V2.04（three size presets: Small / Medium / Large，branch `codex/v2.04-three-size-presets`）
 
-下一步版本：V2.04（三段 size presets: Small / Medium / Large，尚未實作）
+下一步：讓使用者看 Small / Medium / Large 實際畫面，必要時視覺調整尺寸。
 
 ---
 
@@ -16,7 +16,7 @@
 
 ## 目前已完成
 
-- PyQt6 懸浮視窗，永遠在最上層，可拖曳；支援 Current (420x112)、Compact (380x96)、Small (340x84)、Mini (300x74) 四種固定密度尺寸
+- PyQt6 懸浮視窗，永遠在最上層，可拖曳；支援 Small (300x74)、Medium (360x90)、Large (420x112) 三種固定密度尺寸
 - Windows 11 DWM 圓角與 Spotify 綠色系統邊框
 - Spotify OAuth PKCE 授權與 token refresh
 - 每秒 poll Spotify currently-playing，更新歌名、歌手、播放狀態、進度條
@@ -24,7 +24,7 @@
 - NetEase 作為 fallback：LRCLIB 確認沒有同步歌詞時啟用；LRCLIB 暫時不可用時也會補救查一次
 - 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
 - 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
-- system tray：左鍵 toggle widget 顯示/隱藏，右鍵 menu 有 Size submenu（Current / Compact / Small / Mini）和 Quit
+- system tray：左鍵 toggle widget 顯示/隱藏，右鍵 menu 有 Size submenu（Small / Medium / Large）和 Quit
 - single-instance guard：重複開啟會聚焦既有視窗，不開第二個
 - `run.pyw` 無 console 啟動，錯誤寫入 log
 - V2 hover-only 播放控制：上一首、播放/暫停、下一首
@@ -35,8 +35,9 @@
 - V2.03 size presets：tray menu 可切換 Current / Compact / Small / Mini 四種固定密度尺寸；所有 preset 歌詞顯示兩行；選擇會持久化到 config
 - V2.03 tray 精簡：移除 Show/Hide 和 Open log file，左鍵點 tray icon 直接 toggle widget 顯示/隱藏
 - V2.03 optimistic play/pause：點擊播放/暫停按鈕後立刻翻轉 icon 狀態，不等 API 回應
+- V2.04 three size presets：收斂為 Small / Medium / Large 三種尺寸；舊 `mini / compact / current` config key 會 alias 到新值，`small` 直接代表 V2.04 新 Small
 
-最新完整測試紀錄：`218 passed`（2026-06-07）
+最新完整測試紀錄：`223 passed`（2026-06-07）
 
 ---
 
@@ -153,7 +154,7 @@ Branch `codex/v2.03-size-presets`，worktree `.worktrees/v2.03-size-presets`。
 
 ---
 
-## V2.04 three size presets（文件已完成，尚未實作）
+## V2.04 three size presets（已實作，等待視覺 review）
 
 V2.03 實機觀察後，四段尺寸過細，且 Compact / Small 的間距不像同一套均勻階梯。V2.04 決定收斂成三段：
 
@@ -161,23 +162,37 @@ V2.03 實機觀察後，四段尺寸過細，且 Compact / Small 的間距不像
 - Medium：原 Compact / Small 合併，`360x90`
 - Large：原 Current，`420x112`，也是預設
 
-Config 允許值會改成 `small / medium / large`，不新增額外 config 版本欄位。V2.04 直接重排 preset table；舊 config 裡已存在的 `small` 會被當成 V2.04 新 Small。移除的舊 key 用簡單 alias：
+Config 允許值已改成 `small / medium / large`，不新增額外 config 版本欄位。V2.04 直接重排 preset table；舊 config 裡已存在的 `small` 會被當成 V2.04 新 Small。移除的舊 key 用簡單 alias：
 
 - `mini` → `small`
 - `compact` → `medium`
 - `current` → `large`
+
+實作 branch：`codex/v2.04-three-size-presets`
+
+主要 commits：
+
+- `efd7323` — `feat: normalize three widget size presets`
+- `a1dec48` — `feat: collapse widget size presets to three`
+- `92b1402` — `feat: update tray size preset actions`
+- `42f12b2` — `test: use three size preset names in app flow`
+
+驗證：
+
+- Focused suite：`86 passed`
+- Full suite：`223 passed`
 
 文件：
 
 - Spec：`docs/superpowers/specs/2026-06-07-spotify-widget-three-size-presets-design.md`
 - Plan：`docs/superpowers/plans/2026-06-07-spotify-widget-three-size-presets.md`
 
-下一個 agent 要照 V2.04 plan 用 TDD 實作，完成後讓使用者看實際 Small / Medium / Large 三種畫面，再視覺調整尺寸。
+下一步要讓使用者看實際 Small / Medium / Large 三種畫面，再視覺調整尺寸。視覺確認後再決定是否 merge 回 `master`。
 
 ---
 
 ## 建議下一步
 
-1. 接續 V2.04 three size presets implementation plan。
-2. 實作完成後做實機視覺 review，必要時調整 Small / Medium / Large 尺寸。
+1. 做 V2.04 實機視覺 review，必要時調整 Small / Medium / Large 尺寸。
+2. 視覺確認後 merge `codex/v2.04-three-size-presets` 回 `master`。
 3. V2.04 穩定後再進 V3：PyInstaller 打包、first-run UX、捷徑/資源路徑整理。
