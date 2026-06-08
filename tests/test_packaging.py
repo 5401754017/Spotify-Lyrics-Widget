@@ -18,6 +18,36 @@ def test_build_script_creates_portable_release_without_deleting_outputs():
     assert "Remove-Item" not in script
 
 
+def test_build_script_checks_existing_release_outputs_before_pyinstaller():
+    script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
+
+    pyinstaller_index = script.index(
+        "python -m PyInstaller --noconfirm SpotifyLyricsWidget.spec"
+    )
+
+    assert script.index("if (Test-Path -LiteralPath $releaseDir)") < pyinstaller_index
+    assert script.index("if (Test-Path -LiteralPath $zipPath)") < pyinstaller_index
+
+
+def test_build_script_checks_pyinstaller_exit_code_before_using_source_dir():
+    script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
+
+    pyinstaller_index = script.index(
+        "python -m PyInstaller --noconfirm SpotifyLyricsWidget.spec"
+    )
+    exit_code_index = script.index("$LASTEXITCODE")
+    source_dir_index = script.index("$sourceDir")
+
+    assert pyinstaller_index < exit_code_index < source_dir_index
+
+
+def test_pyinstaller_spec_disables_upx_compression():
+    spec = Path("SpotifyLyricsWidget.spec").read_text(encoding="utf-8")
+
+    assert "upx=False" in spec
+    assert "upx=True" not in spec
+
+
 def test_gitignore_allows_committed_pyinstaller_spec():
     gitignore = Path(".gitignore").read_text(encoding="utf-8")
 
