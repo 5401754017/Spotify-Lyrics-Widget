@@ -1,6 +1,9 @@
 import logging
 from unittest.mock import MagicMock, patch
 
+import pytest
+from PyQt6.QtWidgets import QDialog
+
 import src.main as main_module
 from src.main import App
 from src.spotify_worker import PlayerState
@@ -26,12 +29,74 @@ def _make_app():
     return app, config, widget
 
 
+def test_start_missing_client_id_uses_onboarding_dialog():
+    app, config, _ = _make_app()
+    config.client_id = None
+    config.size_preset = "large"
+    app._ensure_auth = MagicMock(return_value=True)
+    qapp = MagicMock()
+    dialog = MagicMock()
+    dialog.exec.return_value = QDialog.DialogCode.Accepted
+    dialog.client_id = "client-from-dialog"
+
+    with (
+        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.SpotifyOnboardingDialog", return_value=dialog) as dialog_class,
+        patch("src.main.TrayIcon"),
+    ):
+        app.start()
+
+    dialog_class.assert_called_once_with(main_module.REDIRECT_URI)
+    assert config.client_id == "client-from-dialog"
+    config.save.assert_called_once()
+    app._ensure_auth.assert_called_once()
+    app._spotify_worker.start.assert_called_once()
+
+
+def test_start_cancelled_onboarding_exits_without_starting_workers():
+    app, config, _ = _make_app()
+    config.client_id = None
+    dialog = MagicMock()
+    dialog.exec.return_value = QDialog.DialogCode.Rejected
+
+    with (
+        patch("src.main.SpotifyOnboardingDialog", return_value=dialog),
+        patch("src.main.sys.exit", side_effect=SystemExit) as exit_app,
+        pytest.raises(SystemExit),
+    ):
+        app.start()
+
+    exit_app.assert_called_once_with(1)
+    config.save.assert_not_called()
+    app._spotify_worker.start.assert_not_called()
+
+
+def test_start_existing_client_id_skips_onboarding_dialog():
+    app, config, _ = _make_app()
+    config.client_id = "existing-client"
+    config.size_preset = "large"
+    app._ensure_auth = MagicMock(return_value=True)
+    qapp = MagicMock()
+
+    with (
+        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.SpotifyOnboardingDialog") as dialog_class,
+        patch("src.main.TrayIcon"),
+    ):
+        app.start()
+
+    dialog_class.assert_not_called()
+    app._ensure_auth.assert_called_once()
+    app._spotify_worker.start.assert_called_once()
+
+
 def test_main_configures_logging_before_starting_qapplication():
     events = []
 
     with (
         patch("src.main.configure_logging", side_effect=lambda: events.append("log")),
         patch("src.main.QApplication", side_effect=lambda argv: events.append("qt") or MagicMock(exec=lambda: 0)),
+        patch("src.main.load_app_font"),
         patch("src.main.App"),
         patch("src.main.SingleInstanceGuard") as guard_class,
         patch("src.main.sys.exit", side_effect=lambda code=0: events.append(("exit", code))),
@@ -69,6 +134,7 @@ def test_main_logs_and_shows_startup_failure():
     with (
         patch("src.main.configure_logging"),
         patch("src.main.QApplication", return_value=app_instance),
+        patch("src.main.load_app_font"),
         patch("src.main.App", return_value=controller),
         patch("src.main.SingleInstanceGuard") as guard_class,
         patch("src.main.logging.exception") as log_exception,

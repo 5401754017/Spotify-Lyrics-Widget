@@ -4,6 +4,7 @@ __pycache__/
 dist/
 build/
 *.spec
+!SpotifyLyricsWidget.spec
 .env
 .worktrees/
 spotify-widget-v1-smoke.png
