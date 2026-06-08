@@ -3,3 +3,4 @@ httpx>=0.27.0
 pytest>=8.0.0
 pytest-qt>=4.4.0
 zhconv>=1.4.3
+pyinstaller>=6.0.0
