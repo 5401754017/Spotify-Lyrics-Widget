@@ -4,14 +4,21 @@ import time
 
 from PyQt6.QtCore import QObject, pyqtSlot
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
-from PyQt6.QtWidgets import QApplication, QInputDialog, QMessageBox
+from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox
 
-from src.auth import SCOPES, has_required_scopes, is_token_expired, refresh_access_token
+from src.auth import (
+    REDIRECT_URI,
+    SCOPES,
+    has_required_scopes,
+    is_token_expired,
+    refresh_access_token,
+)
 from src.auth_server import run_oauth_flow
 from src.config import Config
 from src.fonts import load_app_font
 from src.logging_setup import configure_logging
 from src.lyrics_worker import LyricsWorker, TrackInfo
+from src.onboarding import SpotifyOnboardingDialog
 from src.playback import PlaybackController
 from src.spotify_worker import PlayerState, SpotifyWorker
 from src.tray import TrayIcon
@@ -107,15 +114,10 @@ class App(QObject):
 
     def start(self):
         if not self._config.client_id:
-            client_id, ok = QInputDialog.getText(
-                None,
-                "Spotify Lyrics Widget",
-                "Paste your Spotify App client_id:",
-            )
-            if not ok or not client_id.strip():
-                QMessageBox.critical(None, "Error", "client_id is required.")
+            dialog = SpotifyOnboardingDialog(REDIRECT_URI)
+            if dialog.exec() != QDialog.DialogCode.Accepted:
                 sys.exit(1)
-            self._config.client_id = client_id.strip()
+            self._config.client_id = dialog.client_id
             self._config.save()
 
         if not self._ensure_auth():
