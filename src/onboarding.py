@@ -35,8 +35,9 @@ class SpotifyOnboardingDialog(QDialog):
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
+        # Step 1: Open Dashboard
         dashboard_row = QHBoxLayout()
-        dashboard_text = QLabel("1. 開啟 Spotify Developer Dashboard")
+        dashboard_text = QLabel("1. 開啟 Spotify Developer Dashboard，按 Create App")
         dashboard_button = QPushButton("開啟 Dashboard")
         dashboard_button.setObjectName("open_dashboard_button")
         dashboard_button.clicked.connect(self._open_dashboard)
@@ -44,7 +45,18 @@ class SpotifyOnboardingDialog(QDialog):
         dashboard_row.addWidget(dashboard_button)
         layout.addLayout(dashboard_row)
 
-        redirect_label = QLabel("2. 把這個 Redirect URI 加到你的 Spotify app")
+        # Step 2: Fill in app details
+        create_hint = QLabel(
+            "2. App name 和 Description 隨便填，API 選 Web API"
+        )
+        create_hint.setWordWrap(True)
+        layout.addWidget(create_hint)
+
+        # Step 3: Add Redirect URI
+        redirect_label = QLabel(
+            "3. 在 Redirect URI 欄位貼上下面這串，然後勾選同意條款，按 Save"
+        )
+        redirect_label.setWordWrap(True)
         layout.addWidget(redirect_label)
 
         redirect_row = QHBoxLayout()
@@ -58,7 +70,11 @@ class SpotifyOnboardingDialog(QDialog):
         redirect_row.addWidget(copy_button)
         layout.addLayout(redirect_row)
 
-        client_label = QLabel("3. 貼上你的 Client ID")
+        # Step 4: Copy Client ID
+        client_label = QLabel(
+            "4. App 建好後，到 Settings 複製 Client ID，貼到下面"
+        )
+        client_label.setWordWrap(True)
         layout.addWidget(client_label)
 
         self._client_id_input = QLineEdit()

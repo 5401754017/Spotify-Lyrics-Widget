@@ -13,17 +13,19 @@ Windows 桌面 Spotify 歌詞小工具。
 
 這個工具需要你自己的 Spotify App Client ID。
 
-1. 在設定視窗按「開啟 Dashboard」。
-2. 到 Spotify Developer Dashboard 建立一個 app。
-3. 在 Spotify app 設定裡加入 Redirect URI：
-
-```text
-http://127.0.0.1:8888/callback
-```
-
-4. 複製 Spotify app 的 Client ID。
-5. 回到工具，把 Client ID 貼上。
-6. 按「連接 Spotify」，瀏覽器會開啟 Spotify 登入授權。
+1. 在設定視窗按「開啟 Dashboard」，登入 Spotify 後按 **Create App**。
+2. 填寫 App 資料：
+   - **App name**：隨便取（例如 `Lyrics Widget`）
+   - **App description**：隨便寫
+   - **Redirect URI**：貼上下面這串，按 Add
+     ```
+     http://127.0.0.1:8888/callback
+     ```
+   - **API**：勾選 **Web API**
+   - 勾選同意條款，按 **Save**
+3. App 建好後，進入 app 頁面，到 **Settings** 複製 **Client ID**。
+4. 回到工具，把 Client ID 貼上，按「連接 Spotify」。
+5. 瀏覽器會開啟 Spotify 登入授權，按 **Agree** 同意。
 
 ## 資料位置
 
