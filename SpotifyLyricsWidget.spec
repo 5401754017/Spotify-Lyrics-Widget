@@ -1,11 +1,16 @@
 # -*- mode: python ; coding: utf-8 -*-
 
+from PyInstaller.utils.hooks import collect_data_files
+
 
 a = Analysis(
     ["run.pyw"],
     pathex=[],
     binaries=[],
-    datas=[("assets/fonts/NotoSansTC-VF.ttf", "assets/fonts")],
+    datas=[
+        ("assets/fonts/NotoSansTC-VF.ttf", "assets/fonts"),
+        *collect_data_files("zhconv"),
+    ],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},

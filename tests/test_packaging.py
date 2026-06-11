@@ -9,6 +9,13 @@ def test_pyinstaller_spec_keeps_windowed_app_and_font_asset():
     assert 'name="SpotifyLyricsWidget"' in spec
 
 
+def test_pyinstaller_spec_collects_zhconv_data_files():
+    spec = Path("SpotifyLyricsWidget.spec").read_text(encoding="utf-8")
+
+    assert "collect_data_files" in spec
+    assert 'collect_data_files("zhconv")' in spec
+
+
 def test_build_script_creates_portable_release_without_deleting_outputs():
     script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
 
