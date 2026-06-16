@@ -22,6 +22,12 @@ def test_build_tray_icon_not_null(qtbot):
     assert not build_tray_icon().isNull()
 
 
+def test_build_tray_icon_uses_app_icon_asset(qtbot):
+    sizes = build_tray_icon().availableSizes()
+
+    assert any(size.width() >= 256 and size.height() >= 256 for size in sizes)
+
+
 def test_trigger_calls_on_toggle(qtbot):
     calls = []
     tray = _make_tray(on_toggle=lambda: calls.append("toggle"))

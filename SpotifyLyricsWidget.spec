@@ -8,6 +8,7 @@ a = Analysis(
     pathex=[],
     binaries=[],
     datas=[
+        ("assets/app-icon.ico", "assets"),
         ("assets/fonts/NotoSansTC-VF.ttf", "assets/fonts"),
         *collect_data_files("zhconv"),
     ],
@@ -34,6 +35,7 @@ exe = EXE(
     disable_windowed_traceback=False,
     argv_emulation=False,
     target_arch=None,
+    icon="assets/app-icon.ico",
     codesign_identity=None,
     entitlements_file=None,
 )

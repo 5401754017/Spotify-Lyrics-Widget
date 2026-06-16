@@ -16,6 +16,17 @@ def test_pyinstaller_spec_collects_zhconv_data_files():
     assert 'collect_data_files("zhconv")' in spec
 
 
+def test_pyinstaller_spec_uses_app_icon_asset():
+    spec = Path("SpotifyLyricsWidget.spec").read_text(encoding="utf-8")
+
+    assert '("assets/app-icon.ico", "assets")' in spec
+    assert 'icon="assets/app-icon.ico"' in spec
+
+
+def test_app_icon_asset_exists():
+    assert Path("assets/app-icon.ico").is_file()
+
+
 def test_build_script_creates_portable_release_without_deleting_outputs():
     script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
 

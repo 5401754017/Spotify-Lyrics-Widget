@@ -6,6 +6,7 @@ from PyQt6.QtCore import QObject, pyqtSlot
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox
 
+from src.app_icon import build_app_icon
 from src.auth import (
     REDIRECT_URI,
     SCOPES,
@@ -321,6 +322,7 @@ def main():
     configure_logging()
     app = QApplication(sys.argv)
     app.setApplicationName("Spotify Lyrics Widget")
+    app.setWindowIcon(build_app_icon())
     load_app_font()
 
     guard = None

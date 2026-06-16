@@ -1,9 +1,7 @@
-from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QActionGroup, QBrush, QColor, QIcon, QPainter, QPixmap
+from PyQt6.QtGui import QActionGroup, QIcon
 from PyQt6.QtWidgets import QMenu, QSystemTrayIcon
 
-
-SPOTIFY_GREEN = "#1DB954"
+from src.app_icon import build_app_icon
 
 SIZE_ACTIONS = [
     ("Small", "small"),
@@ -13,15 +11,7 @@ SIZE_ACTIONS = [
 
 
 def build_tray_icon() -> QIcon:
-    pixmap = QPixmap(64, 64)
-    pixmap.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pixmap)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.setBrush(QBrush(QColor(SPOTIFY_GREEN)))
-    painter.drawEllipse(4, 4, 56, 56)
-    painter.end()
-    return QIcon(pixmap)
+    return build_app_icon()
 
 
 class TrayIcon:
