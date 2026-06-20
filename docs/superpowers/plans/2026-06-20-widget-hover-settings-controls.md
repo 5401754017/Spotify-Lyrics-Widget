@@ -1,91 +1,94 @@
 # Widget Hover Settings Controls Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+>
+> 中文說明：這份計畫交給下一位 agent 或下一輪對話執行時，必須逐項打勾推進。建議用 `superpowers:subagent-driven-development`；如果要在同一個對話內做，改用 `superpowers:executing-plans`。
 
-**Goal:** Replace the widget playback controls with hover-only settings, hide, and quit controls while keeping the tray as the fallback show/hide and quit entry point.
+**Goal:** 把 widget 上的播放控制移除，改成 hover 才顯示的設定、隱藏、退出控制，同時保留 tray 作為顯示/隱藏與退出的備用入口。
 
-**Architecture:** Size selection moves from the tray menu into the widget hover controls. Playback control wiring is removed from the widget and app controller because playback is now handled by Spotify/taskbar controls. The tray becomes a small fallback menu with only show/hide and quit behavior.
+**Architecture:** size 選單從 tray 移到 widget 的齒輪浮出選單。widget 和主控制器不再連接播放控制，因為播放/暫停/上一首/下一首交給 Spotify 或工作列 hover 小窗處理。tray 簡化成只負責 `Open / Hide` 和 `Quit`。
 
 **Tech Stack:** Python, PyQt6, pytest, pytest-qt, Windows system tray.
 
 ---
 
-## Current Confirmed State
+## 目前已確認狀態
 
-- Performance-saving work is already committed as `421a20b perf: reduce idle polling overhead`.
-- Full verification for that commit passed with `python -m pytest -q` reporting `252 passed`.
-- No extra performance documentation is needed right now because the behavior is covered by tests and the commit is narrow.
+- 效能節約設定已提交：`421a20b perf: reduce idle polling overhead`。
+- 該 commit 當時完整測試為 `python -m pytest -q`，結果 `252 passed`。
+- 目前不需要額外補效能文件，因為行為已由測試覆蓋，而且 commit 範圍很窄。
 
-## Intended UI
+## 目標 UI
 
 ```text
-[ song title                         gear   -   x ]
-[ lyric line                                       ]
-[ progress                                         ]
+[ 歌名 / 歌手                       齒輪   -   x ]
+[ 歌詞                                           ]
+[ progress                                      ]
 ```
 
-Hover behavior:
+hover 行為：
 
-- The three right-side controls are hidden by default.
-- Hovering the widget shows `gear`, `-`, and `x`.
-- `gear` opens the size menu: `Small`, `Medium`, `Large`.
-- `-` hides the widget but keeps the app running in the tray.
-- `x` exits the whole program through the current close path.
+- 右側三個控制預設隱藏。
+- 滑鼠移到 widget 上時顯示 `齒輪`、`-`、`x`。
+- `齒輪` 開啟 size 選單：`Small`、`Medium`、`Large`。
+- `-` 隱藏 widget，但程式繼續在 tray 執行。
+- `x` 走目前 close 流程，退出整個程式。
 
-Tray behavior:
+tray 行為：
 
 ```text
 Open / Hide
 Quit
 ```
 
-- Single-clicking the tray icon still toggles show/hide.
-- The tray no longer owns size selection.
+- tray icon 單擊仍然切換顯示/隱藏。
+- tray 不再負責 size 選單。
 
-## Files And Responsibilities
+## 檔案與責任
 
-- Modify `src/widget.py`
-  - Remove playback button imports, signals, widgets, and layout.
-  - Add hover-only settings, hide, and close buttons.
-  - Emit widget-level signals for hide and size preset changes.
-  - Keep layout stable across hover and across all size presets.
+- 修改 `src/widget.py`
+  - 移除 playback button 的 import、signal、widget、layout。
+  - 新增 hover-only 的 settings、hide、close button。
+  - 新增 widget 層級 signal，讓 main controller 處理 hide 和 size preset。
+  - 確保 hover 前後、三種 size preset 都不造成 layout 位移。
 
-- Modify `src/main.py`
-  - Remove `PlaybackController` construction and playback button signal wiring.
-  - Wire widget hide requests to the existing hide/show behavior.
-  - Wire widget size requests to `_on_size_preset_changed`.
-  - Stop telling the tray about size preset changes.
+- 修改 `src/main.py`
+  - 移除 `PlaybackController` 建立與 widget playback signal wiring。
+  - 把 widget hide signal 接到既有顯示/隱藏流程。
+  - 把 widget size signal 接到 `_on_size_preset_changed`。
+  - 不再同步 size preset 到 tray。
 
-- Modify `src/tray.py`
-  - Remove size submenu state.
-  - Keep tray icon creation and single-click toggle.
-  - Add explicit `Open / Hide` menu action and keep `Quit`.
+- 修改 `src/tray.py`
+  - 移除 size submenu。
+  - 保留 tray icon 建立與單擊 toggle。
+  - 新增明確的 `Open / Hide` menu action，保留 `Quit`。
 
-- Modify `tests/test_widget.py`
-  - Replace playback-control expectations with settings/hide/close-control expectations.
-  - Preserve existing layout stability tests.
+- 修改 `tests/test_widget.py`
+  - 將 playback-control 測試改成 settings/hide/close-control 測試。
+  - 保留 layout 穩定性測試。
 
-- Modify `tests/test_main.py`
-  - Replace playback wiring tests with widget settings/hide wiring tests.
-  - Update tray constructor expectations.
+- 修改 `tests/test_main.py`
+  - 將 playback wiring 測試改成 widget settings/hide wiring 測試。
+  - 更新 tray constructor 期待值。
 
-- Modify `tests/test_tray.py`
-  - Replace size menu tests with simplified tray menu tests.
+- 修改 `tests/test_tray.py`
+  - 將 size menu 測試改成簡化後的 tray menu 測試。
 
-- Delete `src/transport_button.py` and `tests/test_transport_button.py`
-  - These become dead code when widget playback controls are removed.
+- 刪除 `src/transport_button.py` 和 `tests/test_transport_button.py`
+  - widget playback controls 移除後，這兩個檔案會變成 dead code。
 
-- Keep `src/playback.py` and `tests/test_playback.py` for this pass
-  - The Spotify playback API wrapper remains tested but unused by the widget. Deleting it can be a separate cleanup commit after confirming no future playback UI is planned.
+- 暫時保留 `src/playback.py` 和 `tests/test_playback.py`
+  - Spotify playback API wrapper 仍有測試，但這次不再從 widget 使用。
+  - 如果之後確認永遠不會回到 widget 播放控制，再另開 cleanup commit 刪除。
 
-## Task 1: Widget Tests For Hover Controls
+## Task 1: Widget Hover Controls 測試
 
 **Files:**
 - Modify: `tests/test_widget.py`
 
-- [ ] **Step 1: Rename the hover visibility test**
+- [ ] **Step 1: 改名並更新 hover visibility 測試**
 
-Replace `test_transport_controls_are_hover_only_and_do_not_move_title` with:
+把 `test_transport_controls_are_hover_only_and_do_not_move_title` 換成：
 
 ```python
 def test_hover_controls_are_hover_only_and_do_not_move_title(qtbot):
@@ -117,9 +120,9 @@ def test_hover_controls_are_hover_only_and_do_not_move_title(qtbot):
     assert widget._track_label.geometry() == title_before
 ```
 
-- [ ] **Step 2: Replace the slot-order geometry test**
+- [ ] **Step 2: 更新右側 slot 順序測試**
 
-Replace `test_transport_controls_sit_between_title_and_close_slots` with:
+把 `test_transport_controls_sit_between_title_and_close_slots` 換成：
 
 ```python
 def test_hover_controls_sit_after_title_slot(qtbot):
@@ -144,9 +147,9 @@ def test_hover_controls_sit_after_title_slot(qtbot):
     assert hide.right() < close.left()
 ```
 
-- [ ] **Step 3: Replace the title-row alignment test**
+- [ ] **Step 3: 更新 title row 對齊測試**
 
-Replace `test_transport_controls_align_with_title_row_height` with:
+把 `test_transport_controls_align_with_title_row_height` 換成：
 
 ```python
 def test_hover_controls_align_with_title_row_height(qtbot):
@@ -167,9 +170,9 @@ def test_hover_controls_align_with_title_row_height(qtbot):
     assert controls_y == title_y
 ```
 
-- [ ] **Step 4: Replace the title elision test**
+- [ ] **Step 4: 更新 title elision 測試**
 
-Replace `test_title_label_elides_before_transport_controls_slot` with:
+把 `test_title_label_elides_before_transport_controls_slot` 換成：
 
 ```python
 def test_title_label_elides_before_hover_controls_slot(qtbot):
@@ -188,9 +191,9 @@ def test_title_label_elides_before_hover_controls_slot(qtbot):
     assert title_right < widget._settings_btn.geometry().left()
 ```
 
-- [ ] **Step 5: Replace playback button signal tests**
+- [ ] **Step 5: 移除 playback button signal 測試，改成 hide 和 size signal 測試**
 
-Remove `test_play_pause_button_reflects_playing_state` and `test_transport_buttons_emit_widget_level_signals`. Add:
+刪除 `test_play_pause_button_reflects_playing_state` 和 `test_transport_buttons_emit_widget_level_signals`，新增：
 
 ```python
 def test_hide_button_emits_hide_requested(qtbot):
@@ -220,9 +223,9 @@ def test_settings_menu_emits_size_preset_requested(qtbot):
     assert blocker.args == ["medium"]
 ```
 
-- [ ] **Step 6: Replace size preset layout test**
+- [ ] **Step 6: 更新 size preset layout 測試**
 
-Replace `test_size_preset_keeps_title_before_controls` with:
+把 `test_size_preset_keeps_title_before_controls` 換成：
 
 ```python
 def test_size_preset_keeps_title_before_hover_controls(qtbot):
@@ -245,7 +248,7 @@ def test_size_preset_keeps_title_before_hover_controls(qtbot):
         assert widget._hide_btn.geometry().right() < widget._close_btn.geometry().left()
 ```
 
-- [ ] **Step 7: Run the widget test subset and confirm expected failures**
+- [ ] **Step 7: 跑 widget 測試，確認會先失敗**
 
 Run:
 
@@ -262,14 +265,14 @@ FAILED tests/test_widget.py::test_hide_button_emits_hide_requested
 FAILED tests/test_widget.py::test_settings_menu_emits_size_preset_requested
 ```
 
-## Task 2: Implement Widget Hover Settings, Hide, And Close Controls
+## Task 2: 實作 Widget Hover Settings / Hide / Close Controls
 
 **Files:**
 - Modify: `src/widget.py`
 
-- [ ] **Step 1: Update imports**
+- [ ] **Step 1: 更新 imports**
 
-Remove `TransportButton`. Add `QMenu` if it is not already imported:
+移除 `TransportButton`。如果還沒 import `QMenu`，加入：
 
 ```python
 from PyQt6.QtWidgets import (
@@ -284,9 +287,9 @@ from PyQt6.QtWidgets import (
 )
 ```
 
-- [ ] **Step 2: Replace control constants**
+- [ ] **Step 2: 替換 control constants**
 
-Replace playback-cluster constants with fixed hover-control slots:
+把 playback cluster 常數換成固定 hover control slot：
 
 ```python
 CONTROL_SLOT_WIDTH = 22
@@ -299,9 +302,9 @@ TOP_ROW_RIGHT_RESERVE = (
 )
 ```
 
-- [ ] **Step 3: Replace size preset fields**
+- [ ] **Step 3: 更新 `WidgetSizePreset` 欄位**
 
-Change `WidgetSizePreset` so the control fields are:
+保留 layout 需要的欄位，將 control 欄位改成：
 
 ```python
     title_control_gap: int
@@ -315,7 +318,7 @@ Change `WidgetSizePreset` so the control fields are:
     control_font_px: int
 ```
 
-Remove these fields from the dataclass:
+移除這些 playback-control 欄位：
 
 ```python
     controls_width: int
@@ -328,9 +331,9 @@ Remove these fields from the dataclass:
     close_font_px: int
 ```
 
-- [ ] **Step 4: Update `SIZE_PRESETS` values**
+- [ ] **Step 4: 更新 `SIZE_PRESETS`**
 
-Use these preset tuples so the total reserved right-side width stays close to the current layout:
+使用以下 preset 值，讓右側保留寬度接近現在版面：
 
 ```python
 "small": WidgetSizePreset(
@@ -347,9 +350,9 @@ Use these preset tuples so the total reserved right-side width stays close to th
 ),
 ```
 
-- [ ] **Step 5: Replace widget signals**
+- [ ] **Step 5: 替換 widget signals**
 
-Use these widget-level signals:
+使用以下 signal：
 
 ```python
     close_requested = pyqtSignal()
@@ -357,9 +360,9 @@ Use these widget-level signals:
     size_preset_requested = pyqtSignal(str)
 ```
 
-- [ ] **Step 6: Add a tiny button factory inside `_setup_ui`**
+- [ ] **Step 6: 在 `_setup_ui` 內加入小型 button factory**
 
-Inside `_setup_ui`, before creating the buttons, add:
+放在建立控制按鈕前：
 
 ```python
         def make_control_button(text: str) -> QPushButton:
@@ -370,9 +373,9 @@ Inside `_setup_ui`, before creating the buttons, add:
             return button
 ```
 
-- [ ] **Step 7: Replace playback control creation**
+- [ ] **Step 7: 替換 playback controls 建立流程**
 
-Remove `_controls_cluster`, `_controls_layout`, `_prev_btn`, `_play_pause_btn`, and `_next_btn`. Create:
+移除 `_controls_cluster`、`_controls_layout`、`_prev_btn`、`_play_pause_btn`、`_next_btn`，改成：
 
 ```python
         self._settings_btn = make_control_button("⚙")
@@ -396,9 +399,9 @@ Remove `_controls_cluster`, `_controls_layout`, `_prev_btn`, `_play_pause_btn`, 
         self._close_btn.clicked.connect(self.close)
 ```
 
-- [ ] **Step 8: Update `apply_size_preset`**
+- [ ] **Step 8: 更新 `apply_size_preset`**
 
-Replace the right-reserve and button sizing block with:
+把 right reserve 與 button sizing block 改成：
 
 ```python
         top_row_right_reserve = (
@@ -409,7 +412,7 @@ Replace the right-reserve and button sizing block with:
         self._top_row_layout.setContentsMargins(0, 0, top_row_right_reserve, 0)
 ```
 
-Then style and size the buttons:
+再設定 button size 與樣式：
 
 ```python
         control_style = (
@@ -422,9 +425,9 @@ Then style and size the buttons:
             button.setStyleSheet(control_style)
 ```
 
-- [ ] **Step 9: Update `_position_overlay_controls`**
+- [ ] **Step 9: 更新 `_position_overlay_controls`**
 
-Use explicit right-side slots:
+使用明確的右側 slot：
 
 ```python
     def _position_overlay_controls(self):
@@ -445,18 +448,18 @@ Use explicit right-side slots:
         )
 ```
 
-- [ ] **Step 10: Remove `set_playing`**
+- [ ] **Step 10: 移除 `set_playing`**
 
-Delete:
+刪除：
 
 ```python
     def set_playing(self, is_playing: bool):
         self._play_pause_btn.set_mode("pause" if is_playing else "play")
 ```
 
-- [ ] **Step 11: Update hover methods**
+- [ ] **Step 11: 更新 hover methods**
 
-Replace hover visibility logic with:
+替換 visibility 邏輯：
 
 ```python
     def _on_enter_hover(self):
@@ -474,7 +477,7 @@ Replace hover visibility logic with:
         self._track_label.stop_marquee()
 ```
 
-- [ ] **Step 12: Run widget tests**
+- [ ] **Step 12: 跑 widget tests**
 
 Run:
 
@@ -488,7 +491,7 @@ Expected:
 tests/test_widget.py ... passed
 ```
 
-- [ ] **Step 13: Commit widget-only work**
+- [ ] **Step 13: commit widget-only work**
 
 Run:
 
@@ -497,19 +500,19 @@ git add src/widget.py tests/test_widget.py
 git commit -m "feat: add widget hover settings controls"
 ```
 
-## Task 3: Main App Wiring Without Playback Buttons
+## Task 3: Main App Wiring 移除 Playback Buttons
 
 **Files:**
 - Modify: `tests/test_main.py`
 - Modify: `src/main.py`
 
-- [ ] **Step 1: Update `_make_app` setup in tests**
+- [ ] **Step 1: 更新 `_make_app` 測試 setup**
 
-No test should expect `PlaybackController` to be created for widget buttons. In `_make_app`, keep the existing patches for config, widget, SpotifyWorker, and LyricsWorker. Do not patch `src.main.PlaybackController`.
+`_make_app` 只保留既有的 `Config`、`LyricsWidget`、`SpotifyWorker`、`LyricsWorker` patch。不要再為 widget button 期待 `PlaybackController` 被建立。
 
-- [ ] **Step 2: Replace playback wiring test**
+- [ ] **Step 2: 替換 playback wiring 測試**
 
-Replace `test_connect_signals_wires_playback_controls` with:
+把 `test_connect_signals_wires_playback_controls` 換成：
 
 ```python
 def test_connect_signals_wires_widget_hide_and_size_controls():
@@ -523,13 +526,13 @@ def test_connect_signals_wires_widget_hide_and_size_controls():
     )
 ```
 
-- [ ] **Step 3: Remove play/pause click test**
+- [ ] **Step 3: 刪除 play/pause click 測試**
 
-Delete `test_play_pause_click_uses_latest_play_state`.
+刪除 `test_play_pause_click_uses_latest_play_state`。
 
-- [ ] **Step 4: Replace playing-icon state test**
+- [ ] **Step 4: 替換 playing icon state 測試**
 
-Replace `test_state_sync_updates_widget_playing_icon` with:
+把 `test_state_sync_updates_widget_playing_icon` 換成：
 
 ```python
 def test_state_sync_resyncs_widget_timer_without_playing_icon():
@@ -542,9 +545,9 @@ def test_state_sync_resyncs_widget_timer_without_playing_icon():
     widget.set_playing.assert_not_called()
 ```
 
-- [ ] **Step 5: Update tray constructor test**
+- [ ] **Step 5: 更新 tray constructor 測試**
 
-Change `test_start_creates_and_shows_tray` expected constructor call to:
+把 `test_start_creates_and_shows_tray` 的 constructor 期待值改成：
 
 ```python
     tray_class.assert_called_once_with(
@@ -553,9 +556,9 @@ Change `test_start_creates_and_shows_tray` expected constructor call to:
     )
 ```
 
-- [ ] **Step 6: Replace tray size-preset constructor test**
+- [ ] **Step 6: 替換 tray size-preset constructor 測試**
 
-Replace `test_start_creates_tray_with_size_preset` with:
+把 `test_start_creates_tray_with_size_preset` 換成：
 
 ```python
 def test_start_creates_tray_without_size_menu_wiring():
@@ -576,9 +579,9 @@ def test_start_creates_tray_without_size_menu_wiring():
     assert "on_size_changed" not in tray_class.call_args.kwargs
 ```
 
-- [ ] **Step 7: Update size-preset change test**
+- [ ] **Step 7: 更新 size-preset change 測試**
 
-In `test_size_preset_change_updates_widget_and_config`, remove tray expectations:
+在 `test_size_preset_change_updates_widget_and_config` 移除 tray size sync 期待：
 
 ```python
     app._tray = MagicMock()
@@ -594,7 +597,7 @@ In `test_size_preset_change_updates_widget_and_config`, remove tray expectations
     app._tray.set_size_preset.assert_not_called()
 ```
 
-- [ ] **Step 8: Run main tests and confirm expected failures**
+- [ ] **Step 8: 跑 main tests，確認會先失敗**
 
 Run:
 
@@ -610,23 +613,23 @@ FAILED tests/test_main.py::test_start_creates_and_shows_tray
 FAILED tests/test_main.py::test_start_creates_tray_without_size_menu_wiring
 ```
 
-- [ ] **Step 9: Remove playback controller from app code**
+- [ ] **Step 9: 從 app code 移除 playback controller**
 
-In `src/main.py`, remove:
+在 `src/main.py` 移除：
 
 ```python
 from src.playback import PlaybackController
 ```
 
-Remove from `App.__init__`:
+在 `App.__init__` 移除：
 
 ```python
         self._playback = PlaybackController(self._config)
 ```
 
-- [ ] **Step 10: Simplify tray construction**
+- [ ] **Step 10: 簡化 tray 建立**
 
-Replace the `TrayIcon` call in `start` with:
+把 `start` 裡的 `TrayIcon` call 換成：
 
 ```python
         self._tray = TrayIcon(
@@ -635,9 +638,9 @@ Replace the `TrayIcon` call in `start` with:
         )
 ```
 
-- [ ] **Step 11: Replace widget signal wiring**
+- [ ] **Step 11: 替換 widget signal wiring**
 
-In `_connect_signals`, remove:
+在 `_connect_signals` 移除：
 
 ```python
         self._widget.prev_clicked.connect(self._playback.previous)
@@ -645,30 +648,30 @@ In `_connect_signals`, remove:
         self._widget.play_pause_clicked.connect(self._on_play_pause_clicked)
 ```
 
-Add:
+加入：
 
 ```python
         self._widget.hide_requested.connect(self._toggle_widget)
         self._widget.size_preset_requested.connect(self._on_size_preset_changed)
 ```
 
-- [ ] **Step 12: Remove playback icon updates**
+- [ ] **Step 12: 移除 playback icon 更新**
 
-In `_on_state_synced`, remove:
-
-```python
-        self._widget.set_playing(is_playing)
-```
-
-In `_on_playback_toggled`, remove:
+在 `_on_state_synced` 移除：
 
 ```python
         self._widget.set_playing(is_playing)
 ```
 
-- [ ] **Step 13: Delete `_on_play_pause_clicked`**
+在 `_on_playback_toggled` 移除：
 
-Remove the whole method:
+```python
+        self._widget.set_playing(is_playing)
+```
+
+- [ ] **Step 13: 刪除 `_on_play_pause_clicked`**
+
+移除整個 method：
 
 ```python
     @pyqtSlot()
@@ -678,16 +681,16 @@ Remove the whole method:
         self._widget.set_playing(self._is_playing)
 ```
 
-- [ ] **Step 14: Stop syncing tray size state**
+- [ ] **Step 14: 停止同步 tray size state**
 
-In `_on_size_preset_changed`, remove:
+在 `_on_size_preset_changed` 移除：
 
 ```python
         if self._tray is not None:
             self._tray.set_size_preset(self._widget.size_preset)
 ```
 
-- [ ] **Step 15: Run main tests**
+- [ ] **Step 15: 跑 main tests**
 
 Run:
 
@@ -701,7 +704,7 @@ Expected:
 tests/test_main.py ... passed
 ```
 
-- [ ] **Step 16: Commit main wiring**
+- [ ] **Step 16: commit main wiring**
 
 Run:
 
@@ -710,15 +713,15 @@ git add src/main.py tests/test_main.py
 git commit -m "refactor: remove widget playback control wiring"
 ```
 
-## Task 4: Simplify Tray Menu
+## Task 4: 簡化 Tray Menu
 
 **Files:**
 - Modify: `tests/test_tray.py`
 - Modify: `src/tray.py`
 
-- [ ] **Step 1: Update tray test factory**
+- [ ] **Step 1: 更新 tray test factory**
 
-Replace `_make_tray` with:
+把 `_make_tray` 換成：
 
 ```python
 def _make_tray(**overrides):
@@ -730,9 +733,9 @@ def _make_tray(**overrides):
     return TrayIcon(**callbacks)
 ```
 
-- [ ] **Step 2: Replace tray menu tests**
+- [ ] **Step 2: 替換 tray menu tests**
 
-Replace `test_menu_has_size_and_quit`, `test_menu_has_size_submenu_with_presets`, and `test_size_action_calls_callback` with:
+把 `test_menu_has_size_and_quit`、`test_menu_has_size_submenu_with_presets`、`test_size_action_calls_callback` 換成：
 
 ```python
 def test_menu_has_open_hide_and_quit(qtbot):
@@ -767,7 +770,7 @@ def test_quit_menu_action_calls_on_quit(qtbot):
     assert calls == ["quit"]
 ```
 
-- [ ] **Step 3: Run tray tests and confirm expected failures**
+- [ ] **Step 3: 跑 tray tests，確認會先失敗**
 
 Run:
 
@@ -782,21 +785,21 @@ FAILED tests/test_tray.py::test_menu_has_open_hide_and_quit
 FAILED tests/test_tray.py::test_open_hide_menu_action_calls_on_toggle
 ```
 
-- [ ] **Step 4: Remove size menu code from tray**
+- [ ] **Step 4: 移除 tray size menu code**
 
-In `src/tray.py`, remove:
+在 `src/tray.py` 移除：
 
 ```python
 from PyQt6.QtGui import QActionGroup, QIcon
 ```
 
-Use:
+改成：
 
 ```python
 from PyQt6.QtGui import QIcon
 ```
 
-Remove:
+移除：
 
 ```python
 SIZE_ACTIONS = [
@@ -806,9 +809,9 @@ SIZE_ACTIONS = [
 ]
 ```
 
-- [ ] **Step 5: Simplify `TrayIcon.__init__`**
+- [ ] **Step 5: 簡化 `TrayIcon.__init__`**
 
-Use this constructor:
+使用這個 constructor：
 
 ```python
 class TrayIcon:
@@ -829,9 +832,9 @@ class TrayIcon:
         self._tray.activated.connect(self._on_tray_activated)
 ```
 
-- [ ] **Step 6: Remove tray size sync API**
+- [ ] **Step 6: 移除 tray size sync API**
 
-Delete:
+刪除：
 
 ```python
     def set_size_preset(self, preset: str):
@@ -839,7 +842,7 @@ Delete:
             self._size_actions[preset].setChecked(True)
 ```
 
-- [ ] **Step 7: Run tray tests**
+- [ ] **Step 7: 跑 tray tests**
 
 Run:
 
@@ -853,7 +856,7 @@ Expected:
 tests/test_tray.py ... passed
 ```
 
-- [ ] **Step 8: Commit tray simplification**
+- [ ] **Step 8: commit tray simplification**
 
 Run:
 
@@ -862,13 +865,13 @@ git add src/tray.py tests/test_tray.py
 git commit -m "refactor: simplify tray menu"
 ```
 
-## Task 5: Delete Dead Transport Button Module
+## Task 5: 刪除 Dead Transport Button Module
 
 **Files:**
 - Delete: `src/transport_button.py`
 - Delete: `tests/test_transport_button.py`
 
-- [ ] **Step 1: Confirm no production imports remain**
+- [ ] **Step 1: 確認 production import 已不存在**
 
 Run:
 
@@ -882,9 +885,9 @@ Expected:
 tests/test_transport_button.py:...
 ```
 
-Only the test file should remain before deletion.
+實作前只應該剩測試檔引用。
 
-- [ ] **Step 2: Delete dead files**
+- [ ] **Step 2: 分開刪除 dead files**
 
 Run as separate commands:
 
@@ -896,7 +899,7 @@ Remove-Item -LiteralPath src\transport_button.py
 Remove-Item -LiteralPath tests\test_transport_button.py
 ```
 
-- [ ] **Step 3: Confirm no imports remain**
+- [ ] **Step 3: 確認已無引用**
 
 Run:
 
@@ -909,7 +912,7 @@ Expected:
 ```text
 ```
 
-- [ ] **Step 4: Run focused tests**
+- [ ] **Step 4: 跑 focused tests**
 
 Run:
 
@@ -923,7 +926,7 @@ Expected:
 tests/test_widget.py tests/test_main.py tests/test_tray.py ... passed
 ```
 
-- [ ] **Step 5: Commit deletion**
+- [ ] **Step 5: commit deletion**
 
 Run:
 
@@ -937,7 +940,7 @@ git commit -m "refactor: remove unused transport button"
 **Files:**
 - No code edits.
 
-- [ ] **Step 1: Run full test suite**
+- [ ] **Step 1: 跑完整測試**
 
 Run:
 
@@ -951,7 +954,7 @@ Expected:
 passed
 ```
 
-- [ ] **Step 2: Confirm git state**
+- [ ] **Step 2: 確認 git state**
 
 Run:
 
@@ -964,22 +967,22 @@ Expected:
 ```text
 ```
 
-- [ ] **Step 3: Manual desktop verification**
+- [ ] **Step 3: 手動桌面驗證**
 
-Launch the app with the normal local command used during development. Verify:
+用平常的本機開發指令啟動 app，確認：
 
 ```text
-1. Widget launches and lyrics still update.
-2. Hover shows gear, -, and x without moving title, lyric, or progress bar.
-3. Gear opens Small / Medium / Large.
-4. Choosing each size changes the widget and persists after restart.
-5. - hides the widget and the tray icon can restore it.
-6. x exits the app and leaves no running widget process.
-7. Tray menu shows only Open / Hide and Quit.
-8. Tray single-click still toggles widget visibility.
+1. Widget 能啟動，歌詞仍正常更新。
+2. Hover 顯示齒輪、-、x，而且 title、歌詞、progress bar 不位移。
+3. 齒輪會開 Small / Medium / Large。
+4. 每個 size 都能切換，重啟後仍保留。
+5. - 會隱藏 widget，而且 tray icon 能恢復顯示。
+6. x 會退出 app，不留下 widget process。
+7. Tray menu 只顯示 Open / Hide 和 Quit。
+8. Tray icon 單擊仍能切換 widget 顯示/隱藏。
 ```
 
-- [ ] **Step 4: Final commit check**
+- [ ] **Step 4: 最終 commit 檢查**
 
 Run:
 
@@ -996,20 +999,20 @@ refactor: remove widget playback control wiring
 feat: add widget hover settings controls
 ```
 
-## Self-Review
+## 自我檢查
 
-- Spec coverage:
-  - Widget settings popup is covered by Task 1 and Task 2.
-  - Widget hide button is covered by Task 1, Task 2, and Task 3.
-  - Close button keeps the existing close path through `self.close()` and `close_requested`.
-  - Tray show/hide fallback is covered by Task 3 and Task 4.
-  - Playback controls are removed from widget and app wiring in Task 2 and Task 3.
+- 需求覆蓋：
+  - widget settings popup：Task 1 和 Task 2。
+  - widget hide button：Task 1、Task 2、Task 3。
+  - close button：保留 `self.close()` 和 `close_requested` 現有路徑。
+  - tray show/hide fallback：Task 3 和 Task 4。
+  - 移除 playback controls：Task 2 和 Task 3。
 
-- Placeholder scan:
-  - No task depends on an unspecified future decision.
-  - The only intentionally deferred cleanup is deleting `src/playback.py`, because the tested API wrapper may still be useful if playback controls return later.
+- 空洞項目掃描：
+  - 沒有空白待補項或未指定的後續決策。
+  - 唯一刻意延後的是 `src/playback.py` cleanup，因為它還是被測試覆蓋的 Spotify playback API wrapper。
 
-- Type consistency:
-  - `hide_requested` is a no-argument signal.
-  - `size_preset_requested` emits the preset string used by `_on_size_preset_changed`.
-  - The widget button names are `_settings_btn`, `_hide_btn`, and `_close_btn` across tests and implementation.
+- 型別一致性：
+  - `hide_requested` 是無參數 signal。
+  - `size_preset_requested` emit preset string，交給 `_on_size_preset_changed`。
+  - widget button 名稱全程使用 `_settings_btn`、`_hide_btn`、`_close_btn`。
