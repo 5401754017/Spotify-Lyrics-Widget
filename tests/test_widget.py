@@ -468,11 +468,23 @@ def test_hover_control_spacing_matches_compact_layout(qtbot):
             + close.width()
         )
 
-        assert title_gap == 20
+        assert title_gap == 32
         assert settings_hide_gap == 0
         assert hide_close_gap == 0
         assert right_reserve == 80
         assert settings.size() == hide.size() == close.size()
+        assert settings.width() == 16
+
+
+def test_hover_icons_fill_smaller_buttons(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    assert widget._settings_btn.icon_fill_ratio == 0.86
+    assert widget._hide_btn.icon_fill_ratio == 0.86
+    assert widget._close_btn.icon_fill_ratio == 0.86
 
 
 def test_hover_controls_align_with_title_row_height(qtbot):

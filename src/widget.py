@@ -44,8 +44,8 @@ WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
-CONTROL_SLOT_WIDTH = 20
-CONTROL_SLOT_HEIGHT = 20
+CONTROL_SLOT_WIDTH = 16
+CONTROL_SLOT_HEIGHT = 16
 CONTROL_GAP = 0
 HOVER_CONTROL_COUNT = 3
 TOP_ROW_RIGHT_RESERVE = (
@@ -94,9 +94,9 @@ SIZE_PRESETS = {
         4,
         10,
         204,
-        20,
-        20,
-        18,
+        32,
+        16,
+        16,
         0,
         6,
         8,
@@ -117,9 +117,9 @@ SIZE_PRESETS = {
         5,
         13,
         242,
-        20,
-        20,
-        19,
+        32,
+        16,
+        16,
         0,
         9,
         9,
@@ -140,9 +140,9 @@ SIZE_PRESETS = {
         8,
         16,
         288,
-        20,
-        20,
-        20,
+        32,
+        16,
+        16,
         0,
         10,
         10,
@@ -162,9 +162,10 @@ _DWM_BORDER_COLOR = 0x0054B91D
 
 
 class HoverIconButton(QPushButton):
-    def __init__(self, icon_name: str, parent=None):
+    def __init__(self, icon_name: str, parent=None, icon_fill_ratio: float = 0.86):
         super().__init__("", parent)
         self.icon_name = icon_name
+        self.icon_fill_ratio = icon_fill_ratio
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setVisible(False)
@@ -196,7 +197,7 @@ class HoverIconButton(QPushButton):
         painter.setBrush(Qt.BrushStyle.NoBrush)
 
         side = min(self.width(), self.height())
-        icon_side = side * 0.62
+        icon_side = side * self.icon_fill_ratio
         center = QPointF(self.width() / 2, self.height() / 2)
 
         if self.icon_name == "settings":
