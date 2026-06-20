@@ -20,7 +20,6 @@ from src.fonts import load_app_font
 from src.logging_setup import configure_logging
 from src.lyrics_worker import LyricsWorker, TrackInfo
 from src.onboarding import SpotifyOnboardingDialog
-from src.playback import PlaybackController
 from src.spotify_worker import PlayerState, SpotifyWorker
 from src.tray import TrayIcon
 from src.widget import LyricsWidget
@@ -100,7 +99,6 @@ class App(QObject):
         self._widget = LyricsWidget()
         self._spotify_worker = SpotifyWorker(self._config)
         self._lyrics_worker = LyricsWorker(netease_fallback=self._config.netease_fallback)
-        self._playback = PlaybackController(self._config)
         self._current_track_id: str | None = None
         self._tray: TrayIcon | None = None
         self._last_heartbeat_ts: float = 0.0
@@ -131,8 +129,6 @@ class App(QObject):
         self._tray = TrayIcon(
             on_toggle=self._toggle_widget,
             on_quit=app.quit if app is not None else (lambda: None),
-            on_size_changed=self._on_size_preset_changed,
-            size_preset=self._config.size_preset,
         )
         self._tray.show()
         self._spotify_worker.start()
@@ -186,9 +182,8 @@ class App(QObject):
         self._spotify_worker.network_error.connect(self._widget.show_offline)
         self._spotify_worker.network_recovered.connect(self._widget.hide_offline)
         self._spotify_worker.rate_limited.connect(self._widget.show_rate_limited)
-        self._widget.prev_clicked.connect(self._playback.previous)
-        self._widget.next_clicked.connect(self._playback.next)
-        self._widget.play_pause_clicked.connect(self._on_play_pause_clicked)
+        self._widget.hide_requested.connect(self._toggle_widget)
+        self._widget.size_preset_requested.connect(self._on_size_preset_changed)
 
         self._lyrics_worker.lyrics_ready.connect(self._on_lyrics_ready)
         self._lyrics_worker.no_lyrics.connect(self._on_no_lyrics)
@@ -230,21 +225,13 @@ class App(QObject):
             logging.info("UI heartbeat alive: progress=%s is_playing=%s", progress_ms, is_playing)
             self._last_heartbeat_ts = now
         self._is_playing = is_playing
-        self._widget.set_playing(is_playing)
         self._widget.resync_local_timer(progress_ms, is_playing, local_ts)
 
     @pyqtSlot(bool)
     def _on_playback_toggled(self, is_playing: bool):
         self._is_playing = is_playing
-        self._widget.set_playing(is_playing)
         if not is_playing:
             self._widget.stop_ui_timer()
-
-    @pyqtSlot()
-    def _on_play_pause_clicked(self):
-        self._playback.toggle(self._is_playing)
-        self._is_playing = not self._is_playing
-        self._widget.set_playing(self._is_playing)
 
     @pyqtSlot()
     def _on_not_a_track(self):
@@ -269,8 +256,6 @@ class App(QObject):
         self._widget.apply_size_preset(preset)
         self._config.size_preset = self._widget.size_preset
         self._config.save()
-        if self._tray is not None:
-            self._tray.set_size_preset(self._widget.size_preset)
 
     def raise_window(self):
         self._widget.showNormal()
