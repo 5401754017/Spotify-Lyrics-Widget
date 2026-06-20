@@ -271,8 +271,6 @@ def test_start_creates_and_shows_tray():
     tray_class.assert_called_once_with(
         on_toggle=app._toggle_widget,
         on_quit=qapp.quit,
-        on_size_changed=app._on_size_preset_changed,
-        size_preset=config.size_preset,
     )
     tray.show.assert_called_once()
 
@@ -471,36 +469,25 @@ def test_ensure_auth_reauths_when_scope_is_stale():
     refresh.assert_not_called()
 
 
-def test_connect_signals_wires_playback_controls():
+def test_connect_signals_wires_widget_hide_and_size_controls():
     app, _, widget = _make_app()
-    app._playback = MagicMock()
 
     app._connect_signals()
 
-    widget.prev_clicked.connect.assert_called_once_with(app._playback.previous)
-    widget.next_clicked.connect.assert_called_once_with(app._playback.next)
-    widget.play_pause_clicked.connect.assert_called_once_with(app._on_play_pause_clicked)
+    widget.hide_requested.connect.assert_called_once_with(app._toggle_widget)
+    widget.size_preset_requested.connect.assert_called_once_with(
+        app._on_size_preset_changed
+    )
 
 
-def test_play_pause_click_uses_latest_play_state():
-    app, _, widget = _make_app()
-    app._playback = MagicMock()
-    app._is_playing = True
-
-    app._on_play_pause_clicked()
-
-    app._playback.toggle.assert_called_once_with(True)
-    assert app._is_playing is False
-    widget.set_playing.assert_called_with(False)
-
-
-def test_state_sync_updates_widget_playing_icon():
+def test_state_sync_resyncs_widget_timer_without_playing_icon():
     app, _, widget = _make_app()
 
     app._on_state_synced(1234, True, 10.0)
 
     assert app._is_playing is True
-    widget.set_playing.assert_called_once_with(True)
+    widget.resync_local_timer.assert_called_once_with(1234, True, 10.0)
+    widget.set_playing.assert_not_called()
 
 
 # ---- V2.03 size presets ----
@@ -527,7 +514,7 @@ def test_app_applies_config_size_preset_on_init():
     widget.apply_size_preset.assert_called_once_with("small")
 
 
-def test_start_creates_tray_with_size_preset():
+def test_start_creates_tray_without_size_menu_wiring():
     app, config, _ = _make_app()
     config.client_id = "client"
     config.size_preset = "medium"
@@ -541,8 +528,8 @@ def test_start_creates_tray_with_size_preset():
         app.start()
 
     tray_class.assert_called_once()
-    assert tray_class.call_args.kwargs["size_preset"] == "medium"
-    assert tray_class.call_args.kwargs["on_size_changed"] == app._on_size_preset_changed
+    assert "size_preset" not in tray_class.call_args.kwargs
+    assert "on_size_changed" not in tray_class.call_args.kwargs
 
 
 def test_size_preset_change_updates_widget_and_config():
@@ -557,4 +544,4 @@ def test_size_preset_change_updates_widget_and_config():
     widget.apply_size_preset.assert_called_once_with("small")
     assert config.size_preset == "small"
     config.save.assert_called_once()
-    app._tray.set_size_preset.assert_called_once_with("small")
+    app._tray.set_size_preset.assert_not_called()

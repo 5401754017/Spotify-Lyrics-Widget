@@ -1,22 +1,27 @@
 import ctypes
 from dataclasses import dataclass
 import logging
+import math
 import sys
 import time
 
-from PyQt6.QtCore import QPoint, QSize, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QCloseEvent,
     QEnterEvent,
     QFont,
     QMouseEvent,
+    QPainter,
+    QPainterPath,
     QPalette,
+    QPen,
 )
 from PyQt6.QtWidgets import (
     QFrame,
     QHBoxLayout,
     QLabel,
+    QMenu,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -27,7 +32,6 @@ from src.fonts import app_font_family
 from src.lyric_clamp import clamp_lyric_text
 from src.lrc_parser import find_current_line
 from src.marquee import MarqueeLabel
-from src.transport_button import TransportButton
 
 
 PANEL_BACKGROUND = "#121212"
@@ -40,11 +44,14 @@ WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
-CONTROLS_CLUSTER_WIDTH = 66
-CONTROLS_CLUSTER_HEIGHT = 24
-CONTROLS_CLOSE_GAP = 12
-CLOSE_SLOT_WIDTH = 28
-TOP_ROW_RIGHT_RESERVE = CONTROLS_CLUSTER_WIDTH + CONTROLS_CLOSE_GAP + CLOSE_SLOT_WIDTH
+CONTROL_SLOT_WIDTH = 12
+CONTROL_SLOT_HEIGHT = 12
+CONTROL_GAP = 2
+HOVER_CONTROL_COUNT = 3
+TOP_ROW_RIGHT_RESERVE = (
+    CONTROL_SLOT_WIDTH * HOVER_CONTROL_COUNT
+    + CONTROL_GAP * (HOVER_CONTROL_COUNT - 1)
+)
 CORNER_RADIUS = 12
 
 
@@ -63,18 +70,14 @@ class WidgetSizePreset:
     left_margin: int
     title_width: int
     title_control_gap: int
-    controls_width: int
-    controls_height: int
-    controls_close_gap: int
-    close_width: int
-    close_height: int
+    control_width: int
+    control_height: int
+    control_gap: int
     right_margin: int
     title_font_pt: int
     lyric_font_pt: int
     lyric_lines: int
-    button_size: QSize
-    controls_spacing: int
-    close_font_px: int
+    control_font_px: int
 
 
 SIZE_PRESETS = {
@@ -90,19 +93,15 @@ SIZE_PRESETS = {
         1,
         4,
         10,
-        198,
-        8,
-        56,
-        22,
-        6,
-        18,
-        18,
+        204,
+        40,
+        12,
+        12,
+        2,
         6,
         8,
         10,
         2,
-        QSize(16, 22),
-        4,
         12,
     ),
     "medium": WidgetSizePreset(
@@ -117,19 +116,15 @@ SIZE_PRESETS = {
         1,
         5,
         13,
-        237,
-        11,
-        62,
-        23,
-        9,
-        19,
-        19,
+        242,
+        40,
+        12,
+        12,
+        2,
         9,
         9,
         13,
         2,
-        QSize(17, 23),
-        5,
         13,
     ),
     "large": WidgetSizePreset(
@@ -144,19 +139,15 @@ SIZE_PRESETS = {
         2,
         8,
         16,
-        282,
-        14,
-        66,
-        24,
+        288,
+        40,
         12,
-        20,
-        20,
+        12,
+        2,
         10,
         10,
         16,
         2,
-        QSize(18, 24),
-        6,
         14,
     ),
 }
@@ -170,13 +161,104 @@ _DWMWA_BORDER_COLOR = 34
 _DWM_BORDER_COLOR = 0x0054B91D
 
 
+class HoverIconButton(QPushButton):
+    def __init__(self, icon_name: str, parent=None, icon_fill_ratio: float = 0.86):
+        super().__init__("", parent)
+        self.icon_name = icon_name
+        self.icon_fill_ratio = icon_fill_ratio
+        self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setVisible(False)
+
+    def enterEvent(self, event: QEnterEvent):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(SPOTIFY_GREEN if self.underMouse() else WHITE)
+        pen_width = max(1.3, min(self.width(), self.height()) * 0.08)
+        painter.setPen(
+            QPen(
+                color,
+                pen_width,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+                Qt.PenJoinStyle.RoundJoin,
+            )
+        )
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        side = min(self.width(), self.height())
+        icon_side = side * self.icon_fill_ratio
+        center = QPointF(self.width() / 2, self.height() / 2)
+
+        if self.icon_name == "settings":
+            self._paint_settings_icon(painter, center, icon_side)
+        elif self.icon_name == "hide":
+            half = icon_side * 0.42
+            painter.drawLine(
+                QPointF(center.x() - half, center.y()),
+                QPointF(center.x() + half, center.y()),
+            )
+        elif self.icon_name == "close":
+            half = icon_side * 0.36
+            painter.drawLine(
+                QPointF(center.x() - half, center.y() - half),
+                QPointF(center.x() + half, center.y() + half),
+            )
+            painter.drawLine(
+                QPointF(center.x() + half, center.y() - half),
+                QPointF(center.x() - half, center.y() + half),
+            )
+
+    def _paint_settings_icon(self, painter: QPainter, center: QPointF, icon_side: float):
+        color = painter.pen().color()
+        outer_radius = icon_side * 0.48
+        inner_tooth_radius = icon_side * 0.36
+        path = QPainterPath()
+        path.setFillRule(Qt.FillRule.OddEvenFill)
+
+        for index in range(16):
+            angle = -math.pi / 2 + index * math.pi / 8
+            radius = outer_radius if index % 2 == 0 else inner_tooth_radius
+            point = QPointF(
+                center.x() + math.cos(angle) * radius,
+                center.y() + math.sin(angle) * radius,
+            )
+            if index == 0:
+                path.moveTo(point)
+            else:
+                path.lineTo(point)
+        path.closeSubpath()
+
+        hole_radius = icon_side * 0.2
+        path.addEllipse(
+            QRectF(
+                center.x() - hole_radius,
+                center.y() - hole_radius,
+                hole_radius * 2,
+                hole_radius * 2,
+            )
+        )
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        painter.drawPath(path)
+
+
 class LyricsWidget(QWidget):
     """Frameless always-on-top floating lyrics widget."""
 
     close_requested = pyqtSignal()
-    prev_clicked = pyqtSignal()
-    play_pause_clicked = pyqtSignal()
-    next_clicked = pyqtSignal()
+    hide_requested = pyqtSignal()
+    size_preset_requested = pyqtSignal(str)
 
     def __init__(self):
         super().__init__()
@@ -277,36 +359,31 @@ class LyricsWidget(QWidget):
         )
         self._top_row_layout.addWidget(self._track_label, stretch=1)
 
-        self._close_btn = QPushButton("✕", self._panel)
-        self._close_btn.setFixedSize(20, 20)
-        self._close_btn.setStyleSheet(
-            f"QPushButton {{ color: {WHITE}; background: transparent; border: none; font-size: 14px; }}"
-            f"QPushButton:hover {{ color: {SPOTIFY_GREEN}; }}"
+        def make_control_button(icon_name: str) -> HoverIconButton:
+            return HoverIconButton(icon_name, self._panel)
+
+        self._settings_btn = make_control_button("settings")
+        self._hide_btn = make_control_button("hide")
+        self._close_btn = make_control_button("close")
+
+        self._size_menu = QMenu(self)
+        for label, value in (("Small", "small"), ("Medium", "medium"), ("Large", "large")):
+            action = self._size_menu.addAction(label)
+            action.setData(value)
+            action.triggered.connect(
+                lambda checked=False, preset=value: self.size_preset_requested.emit(
+                    preset
+                )
+            )
+
+        self._settings_btn.clicked.connect(
+            lambda checked=False: self._size_menu.popup(
+                self._settings_btn.mapToGlobal(self._settings_btn.rect().bottomLeft())
+            )
         )
+        self._hide_btn.clicked.connect(self.hide_requested.emit)
         self._close_btn.clicked.connect(self.close)
-        self._close_btn.setVisible(False)
         self._panel_layout.addWidget(self._top_row)
-
-        self._controls_cluster = QWidget(self._panel)
-        self._controls_cluster.setFixedSize(
-            CONTROLS_CLUSTER_WIDTH, CONTROLS_CLUSTER_HEIGHT
-        )
-        self._controls_cluster.setMouseTracking(True)
-        self._controls_layout = QHBoxLayout(self._controls_cluster)
-        self._controls_layout.setContentsMargins(0, 0, 0, 0)
-        self._controls_layout.setSpacing(6)
-
-        self._prev_btn = TransportButton("previous", self._controls_cluster)
-        self._play_pause_btn = TransportButton("play", self._controls_cluster)
-        self._next_btn = TransportButton("next", self._controls_cluster)
-        self._controls_layout.addWidget(self._prev_btn)
-        self._controls_layout.addWidget(self._play_pause_btn)
-        self._controls_layout.addWidget(self._next_btn)
-
-        self._prev_btn.clicked.connect(self.prev_clicked)
-        self._play_pause_btn.clicked.connect(self.play_pause_clicked)
-        self._next_btn.clicked.connect(self.next_clicked)
-        self._controls_cluster.setVisible(False)
 
         self._lyric_label = QLabel("")
         self._lyric_label.setFont(QFont(app_font_family(), 16, QFont.Weight.Bold))
@@ -353,9 +430,8 @@ class LyricsWidget(QWidget):
 
         top_row_right_reserve = (
             preset.title_control_gap
-            + preset.controls_width
-            + preset.controls_close_gap
-            + preset.close_width
+            + preset.control_width * HOVER_CONTROL_COUNT
+            + preset.control_gap * (HOVER_CONTROL_COUNT - 1)
         )
         self._top_row_layout.setContentsMargins(0, 0, top_row_right_reserve, 0)
 
@@ -367,15 +443,14 @@ class LyricsWidget(QWidget):
         )
         self._lyric_label.setFixedHeight(preset.lyric_lane_height)
         self._progress_bar.setFixedHeight(preset.progress_height)
-        self._controls_cluster.setFixedSize(preset.controls_width, preset.controls_height)
-        self._controls_layout.setSpacing(preset.controls_spacing)
-        for button in (self._prev_btn, self._play_pause_btn, self._next_btn):
-            button.set_button_size(preset.button_size)
-        self._close_btn.setFixedSize(preset.close_width, preset.close_height)
-        self._close_btn.setStyleSheet(
-            f"QPushButton {{ color: {WHITE}; background: transparent; border: none; font-size: {preset.close_font_px}px; }}"
+        control_style = (
+            f"QPushButton {{ color: {WHITE}; background: transparent; border: none; "
+            f"font-size: {preset.control_font_px}px; }}"
             f"QPushButton:hover {{ color: {SPOTIFY_GREEN}; }}"
         )
+        for button in (self._settings_btn, self._hide_btn, self._close_btn):
+            button.setFixedSize(preset.control_width, preset.control_height)
+            button.setStyleSheet(control_style)
         self._panel_layout.activate()
         self._top_row_layout.activate()
         self.setFixedSize(preset.width, preset.height)
@@ -395,6 +470,8 @@ class LyricsWidget(QWidget):
     def set_lyrics(self, lyrics: list[tuple[int, str]]):
         self._lyrics = lyrics
         self._current_line_idx = -1
+        if not self._is_playing:
+            self._update_lyric_display(self._last_synced_ms)
 
     def set_lyric_text(self, text: str):
         width = max(self._lyric_label.width(), self.width() - 32, 1)
@@ -465,14 +542,18 @@ class LyricsWidget(QWidget):
             self._size_preset_name,
             SIZE_PRESETS[DEFAULT_SIZE_PRESET],
         )
-        controls_x = preset.left_margin + preset.title_width + preset.title_control_gap
-        close_x = controls_x + preset.controls_width + preset.controls_close_gap
+        title_right = self._track_label.mapTo(
+            self._panel,
+            self._track_label.rect().topRight(),
+        ).x()
+        x = title_right + preset.title_control_gap + 1
         y = preset.top_padding
-        self._controls_cluster.move(controls_x, y)
-        self._close_btn.move(close_x, y)
-
-    def set_playing(self, is_playing: bool):
-        self._play_pause_btn.set_mode("pause" if is_playing else "play")
+        self._settings_btn.move(x, y)
+        self._hide_btn.move(x + preset.control_width + preset.control_gap, y)
+        self._close_btn.move(
+            x + (preset.control_width + preset.control_gap) * 2,
+            y,
+        )
 
     def _refresh_track_label_text(self):
         self._track_label.update()
@@ -504,15 +585,17 @@ class LyricsWidget(QWidget):
             self._lyric_label.setText("")
 
     def _on_enter_hover(self):
+        self._settings_btn.setVisible(True)
+        self._hide_btn.setVisible(True)
         self._close_btn.setVisible(True)
-        self._controls_cluster.setVisible(True)
         self._track_label.start_marquee()
 
     def _on_leave_hover(self):
         if self.underMouse():
             return
+        self._settings_btn.setVisible(False)
+        self._hide_btn.setVisible(False)
         self._close_btn.setVisible(False)
-        self._controls_cluster.setVisible(False)
         self._track_label.stop_marquee()
 
     def enterEvent(self, event: QEnterEvent):

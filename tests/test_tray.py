@@ -11,8 +11,6 @@ def _make_tray(**overrides):
     callbacks = dict(
         on_toggle=_noop,
         on_quit=_noop,
-        on_size_changed=_noop,
-        size_preset="large",
     )
     callbacks.update(overrides)
     return TrayIcon(**callbacks)
@@ -42,37 +40,33 @@ def test_double_click_does_not_call_on_toggle(qtbot):
     assert calls == []
 
 
-def test_menu_has_size_and_quit(qtbot):
+def test_menu_has_open_hide_and_quit(qtbot):
     tray = _make_tray()
     labels = [action.text() for action in tray._menu.actions() if action.text()]
-    assert "Size" in labels
-    assert "Quit" in labels
-    assert "Open log file" not in labels
-    assert "Hide widget" not in labels
+    assert labels == ["Open / Hide", "Quit"]
 
 
-def test_menu_has_size_submenu_with_presets(qtbot):
-    tray = _make_tray(on_size_changed=lambda name: None, size_preset="small")
-
-    size_actions = [
-        action for action in tray._menu.actions()
-        if action.menu() is not None and action.text() == "Size"
-    ]
-    assert len(size_actions) == 1
-
-    labels = [action.text() for action in tray._size_menu.actions()]
-    assert labels == ["Small", "Medium", "Large"]
-    checked = [action.text() for action in tray._size_menu.actions() if action.isChecked()]
-    assert checked == ["Small"]
-
-
-def test_size_action_calls_callback(qtbot):
+def test_open_hide_menu_action_calls_on_toggle(qtbot):
     calls = []
-    tray = _make_tray(on_size_changed=lambda name: calls.append(name))
+    tray = _make_tray(on_toggle=lambda: calls.append("toggle"))
 
-    medium_action = next(
-        action for action in tray._size_menu.actions() if action.text() == "Medium"
+    open_hide_action = next(
+        action for action in tray._menu.actions()
+        if action.text() == "Open / Hide"
     )
-    medium_action.trigger()
+    open_hide_action.trigger()
 
-    assert calls == ["medium"]
+    assert calls == ["toggle"]
+
+
+def test_quit_menu_action_calls_on_quit(qtbot):
+    calls = []
+    tray = _make_tray(on_quit=lambda: calls.append("quit"))
+
+    quit_action = next(
+        action for action in tray._menu.actions()
+        if action.text() == "Quit"
+    )
+    quit_action.trigger()
+
+    assert calls == ["quit"]
