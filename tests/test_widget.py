@@ -294,6 +294,26 @@ def test_resync_local_timer(qtbot):
     assert widget._is_playing is True
 
 
+def test_resync_not_playing_stops_ui_timer(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.start_ui_timer()
+
+    widget.resync_local_timer(7000, False, time.monotonic())
+
+    assert not widget._ui_timer.isActive()
+
+
+def test_show_not_playing_stops_ui_timer(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.start_ui_timer()
+
+    widget.show_not_playing()
+
+    assert not widget._ui_timer.isActive()
+
+
 def test_offline_state_uses_lyric_lane(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)

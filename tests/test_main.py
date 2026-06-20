@@ -90,12 +90,30 @@ def test_start_existing_client_id_skips_onboarding_dialog():
     app._spotify_worker.start.assert_called_once()
 
 
+def test_start_does_not_start_ui_timer_until_playback_sync():
+    app, config, widget = _make_app()
+    config.client_id = "existing-client"
+    config.size_preset = "large"
+    app._ensure_auth = MagicMock(return_value=True)
+    qapp = MagicMock()
+
+    with (
+        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.TrayIcon"),
+    ):
+        app.start()
+
+    widget.start_ui_timer.assert_not_called()
+    app._spotify_worker.start.assert_called_once()
+
+
 def test_main_configures_logging_before_starting_qapplication():
     events = []
 
     with (
         patch("src.main.configure_logging", side_effect=lambda: events.append("log")),
         patch("src.main.QApplication", side_effect=lambda argv: events.append("qt") or MagicMock(exec=lambda: 0)),
+        patch("src.main.build_app_icon"),
         patch("src.main.load_app_font"),
         patch("src.main.App"),
         patch("src.main.SingleInstanceGuard") as guard_class,
@@ -115,6 +133,7 @@ def test_main_loads_font_before_building_app():
     with (
         patch("src.main.configure_logging"),
         patch("src.main.QApplication", return_value=qapp),
+        patch("src.main.build_app_icon"),
         patch("src.main.load_app_font", side_effect=lambda: events.append("font")),
         patch("src.main.App", side_effect=lambda: events.append("app") or MagicMock()),
         patch("src.main.SingleInstanceGuard") as guard_class,
@@ -134,6 +153,7 @@ def test_main_logs_and_shows_startup_failure():
     with (
         patch("src.main.configure_logging"),
         patch("src.main.QApplication", return_value=app_instance),
+        patch("src.main.build_app_icon"),
         patch("src.main.load_app_font"),
         patch("src.main.App", return_value=controller),
         patch("src.main.SingleInstanceGuard") as guard_class,

@@ -135,7 +135,6 @@ class App(QObject):
             size_preset=self._config.size_preset,
         )
         self._tray.show()
-        self._widget.start_ui_timer()
         self._spotify_worker.start()
 
     def _ensure_auth(self) -> bool:

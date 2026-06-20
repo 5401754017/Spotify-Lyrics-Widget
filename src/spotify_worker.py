@@ -11,6 +11,8 @@ from src.auth import is_token_expired, refresh_access_token
 CURRENTLY_PLAYING_URL = "https://api.spotify.com/v1/me/player/currently-playing"
 SEEK_THRESHOLD_MS = 3000
 DEFAULT_RETRY_AFTER_SECONDS = 1
+PLAYING_POLL_INTERVAL_MS = 1000
+IDLE_POLL_INTERVAL_MS = 5000
 
 
 @dataclass
@@ -95,25 +97,30 @@ class SpotifyWorker(QThread):
     network_recovered = pyqtSignal()
     rate_limited = pyqtSignal(int)
 
-    def __init__(self, config):
+    def __init__(self, config, http_client=None):
         super().__init__()
         self._config = config
+        self._client = http_client or httpx.Client()
         self._running = True
         self._previous_state: PlayerState | None = None
         self._network_failed = False
         self._rate_limited_until = 0.0
+        self._poll_interval_ms = PLAYING_POLL_INTERVAL_MS
 
     def stop(self):
         self._running = False
 
     def run(self):
-        while self._running:
-            self._poll_once()
-            self.msleep(self._next_sleep_ms())
+        try:
+            while self._running:
+                self._poll_once()
+                self.msleep(self._next_sleep_ms())
+        finally:
+            self._client.close()
 
     def _next_sleep_ms(self) -> int:
         if not self._is_rate_limited():
-            return 1000
+            return self._poll_interval_ms
         remaining_ms = int((self._rate_limited_until - time.monotonic()) * 1000)
         return max(100, min(remaining_ms, 1000))
 
@@ -142,7 +149,7 @@ class SpotifyWorker(QThread):
                 self.auth_expired.emit()
                 return None
 
-        response = httpx.get(
+        response = self._client.get(
             CURRENTLY_PLAYING_URL,
             headers={"Authorization": f"Bearer {self._config.access_token}"},
             timeout=5.0,
@@ -152,7 +159,7 @@ class SpotifyWorker(QThread):
             if not self._refresh_token():
                 self.auth_expired.emit()
                 return None
-            response = httpx.get(
+            response = self._client.get(
                 CURRENTLY_PLAYING_URL,
                 headers={"Authorization": f"Bearer {self._config.access_token}"},
                 timeout=5.0,
@@ -193,6 +200,7 @@ class SpotifyWorker(QThread):
         if response.status_code == 204 or (
             response.status_code == 200 and not response.text
         ):
+            self._poll_interval_ms = IDLE_POLL_INTERVAL_MS
             self.not_playing.emit()
             self._previous_state = None
             return
@@ -212,7 +220,12 @@ class SpotifyWorker(QThread):
 
         data = response.json()
         state = parse_player_state(data)
-        logging.info(
+        self._poll_interval_ms = (
+            PLAYING_POLL_INTERVAL_MS
+            if state.is_track and state.is_playing
+            else IDLE_POLL_INTERVAL_MS
+        )
+        logging.debug(
             "Spotify playback summary: status=%s is_playing=%s type=%s "
             "track_id=%s track=%s artist=%s progress_ms=%s",
             response.status_code,

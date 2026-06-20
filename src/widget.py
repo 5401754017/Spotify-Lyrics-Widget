@@ -421,6 +421,7 @@ class LyricsWidget(QWidget):
         if is_playing and not self._ui_timer.isActive():
             self._ui_timer.start()
         elif not is_playing:
+            self._ui_timer.stop()
             self._update_lyric_display(progress_ms)
 
     def show_no_lyrics(self):
@@ -428,11 +429,13 @@ class LyricsWidget(QWidget):
         self._lyric_label.setText("no synced lyrics")
 
     def show_not_playing(self):
+        self._ui_timer.stop()
         self._lyrics = []
         self._lyric_label.setText("not playing")
         self.update_progress(0)
 
     def show_not_a_track(self):
+        self._ui_timer.stop()
         self._lyrics = []
         self._lyric_label.setText("not a track")
 

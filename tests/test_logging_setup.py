@@ -21,6 +21,16 @@ def test_configure_logging_writes_rotating_file_under_appdata(tmp_path, monkeypa
     assert handlers[-1].backupCount == 3
 
 
+def test_configure_logging_keeps_httpx_noise_at_warning(tmp_path, monkeypatch):
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    logging.getLogger("httpx").setLevel(logging.NOTSET)
+    module = importlib.import_module("src.logging_setup")
+
+    module.configure_logging()
+
+    assert logging.getLogger("httpx").level == logging.WARNING
+
+
 def test_log_file_path_under_appdata(monkeypatch, tmp_path):
     from src.logging_setup import log_file_path
 

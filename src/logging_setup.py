@@ -36,6 +36,8 @@ def configure_logging() -> Path:
 
     root_logger = logging.getLogger()
     root_logger.setLevel(logging.INFO)
+    logging.getLogger("httpx").setLevel(logging.WARNING)
+    logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     for handler in list(root_logger.handlers):
         if getattr(handler, "_spotify_widget_handler", False):

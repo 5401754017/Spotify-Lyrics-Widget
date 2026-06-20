@@ -7,6 +7,35 @@ import httpx
 from src.spotify_worker import PlayerState, detect_changes, parse_player_state
 
 
+def _make_config():
+    mock_config = MagicMock()
+    mock_config.token_expires_at = int(time.time()) + 3600
+    mock_config.access_token = "valid"
+    mock_config.refresh_token = "refresh"
+    mock_config.client_id = "client"
+    return mock_config
+
+
+def _track_response(is_playing=True, progress_ms=45000):
+    return MagicMock(
+        status_code=200,
+        text='{"is_playing": true}',
+        json=lambda: {
+            "is_playing": is_playing,
+            "progress_ms": progress_ms,
+            "currently_playing_type": "track",
+            "item": {
+                "id": "track_123",
+                "name": "Test Song",
+                "uri": "spotify:track:track_123",
+                "duration_ms": 240000,
+                "artists": [{"name": "Artist A"}],
+                "album": {"name": "Test Album"},
+            },
+        },
+    )
+
+
 class TestParsePlayerState:
     def test_parse_track(self):
         response_data = {
@@ -120,22 +149,19 @@ class TestDetectChanges:
 
 
 class TestSpotifyWorker401:
-    @patch("src.spotify_worker.httpx.get")
     @patch("src.spotify_worker.refresh_access_token")
-    def test_401_triggers_refresh_and_retry(self, mock_refresh, mock_get):
+    def test_401_triggers_refresh_and_retry(self, mock_refresh):
         from src.spotify_worker import SpotifyWorker
 
-        mock_config = MagicMock()
+        mock_config = _make_config()
         mock_config.access_token = "old_token"
-        mock_config.refresh_token = "refresh"
-        mock_config.client_id = "client"
-        mock_config.token_expires_at = int(time.time()) + 3600
+        client = MagicMock()
 
         mock_refresh.return_value = {
             "access_token": "new_token",
             "expires_in": 3600,
         }
-        mock_get.side_effect = [
+        client.get.side_effect = [
             MagicMock(status_code=401),
             MagicMock(
                 status_code=200,
@@ -149,44 +175,25 @@ class TestSpotifyWorker401:
             ),
         ]
 
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(mock_config, http_client=client)
         response = worker._make_spotify_request()
         assert response.status_code == 200
         mock_refresh.assert_called()
+        assert client.get.call_count == 2
 
 
 class TestSpotifyWorkerDiagnostics:
-    @patch("src.spotify_worker.logging.info")
-    @patch("src.spotify_worker.httpx.get")
-    def test_200_track_response_logs_playback_summary(self, mock_get, log_info):
+    @patch("src.spotify_worker.logging.debug")
+    def test_200_track_response_logs_playback_summary_at_debug(self, log_debug):
         from src.spotify_worker import SpotifyWorker
 
-        mock_get.return_value = MagicMock(
-            status_code=200,
-            text='{"is_playing": true}',
-            json=lambda: {
-                "is_playing": True,
-                "progress_ms": 45000,
-                "currently_playing_type": "track",
-                "item": {
-                    "id": "track_123",
-                    "name": "Test Song",
-                    "uri": "spotify:track:track_123",
-                    "duration_ms": 240000,
-                    "artists": [{"name": "Artist A"}],
-                    "album": {"name": "Test Album"},
-                },
-            },
-        )
+        client = MagicMock()
+        client.get.return_value = _track_response()
 
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
-
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         worker._poll_once()
 
-        log_info.assert_any_call(
+        log_debug.assert_any_call(
             "Spotify playback summary: status=%s is_playing=%s type=%s "
             "track_id=%s track=%s artist=%s progress_ms=%s",
             200,
@@ -200,17 +207,13 @@ class TestSpotifyWorkerDiagnostics:
 
 
 class TestSpotifyWorkerNetworkError:
-    @patch("src.spotify_worker.httpx.get")
-    def test_network_error_emits_signal(self, mock_get):
+    def test_network_error_emits_signal(self):
         from src.spotify_worker import SpotifyWorker
 
-        mock_get.side_effect = httpx.ConnectError("No internet")
+        client = MagicMock()
+        client.get.side_effect = httpx.ConnectError("No internet")
 
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
-
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         error_signals = []
         worker.network_error.connect(lambda: error_signals.append("error"))
 
@@ -220,20 +223,16 @@ class TestSpotifyWorkerNetworkError:
         worker._poll_once()
         assert len(error_signals) == 1
 
-    @patch("src.spotify_worker.httpx.get")
-    def test_recovery_after_network_error(self, mock_get):
+    def test_recovery_after_network_error(self):
         from src.spotify_worker import SpotifyWorker
 
-        mock_get.side_effect = [
+        client = MagicMock()
+        client.get.side_effect = [
             httpx.ConnectError("No internet"),
             MagicMock(status_code=204, text=""),
         ]
 
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
-
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         error_signals = []
         recovered_signals = []
         worker.network_error.connect(lambda: error_signals.append("error"))
@@ -248,16 +247,13 @@ class TestSpotifyWorkerNetworkError:
         assert len(recovered_signals) == 1
 
 
-@patch("src.spotify_worker.httpx.get")
-def test_poll_once_warns_with_concrete_reason_on_network_error(mock_get, caplog):
+def test_poll_once_warns_with_concrete_reason_on_network_error(caplog):
     from src.spotify_worker import SpotifyWorker
 
-    mock_get.side_effect = httpx.ConnectError("no internet")
-    mock_config = MagicMock()
-    mock_config.token_expires_at = int(time.time()) + 3600
-    mock_config.access_token = "valid"
+    client = MagicMock()
+    client.get.side_effect = httpx.ConnectError("no internet")
 
-    worker = SpotifyWorker(mock_config)
+    worker = SpotifyWorker(_make_config(), http_client=client)
     caplog.set_level(logging.WARNING, logger="root")
     worker._poll_once()
 
@@ -271,20 +267,17 @@ def test_poll_once_warns_with_concrete_reason_on_network_error(mock_get, caplog)
 
 
 class TestSpotifyWorkerRateLimit:
-    @patch("src.spotify_worker.httpx.get")
-    def test_429_sets_retry_after_backoff_and_emits_signal(self, mock_get):
+    def test_429_sets_retry_after_backoff_and_emits_signal(self):
         from src.spotify_worker import SpotifyWorker
 
-        mock_get.return_value = MagicMock(
+        client = MagicMock()
+        client.get.return_value = MagicMock(
             status_code=429,
             text="",
             headers={"Retry-After": "30"},
         )
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
 
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         signals = []
         worker.rate_limited.connect(lambda seconds: signals.append(seconds))
 
@@ -294,54 +287,44 @@ class TestSpotifyWorkerRateLimit:
         assert signals == [30]
         assert worker._rate_limited_until == 130.0
 
-    @patch("src.spotify_worker.httpx.get")
-    def test_rate_limit_backoff_skips_polling_until_retry_after(self, mock_get):
+    def test_rate_limit_backoff_skips_polling_until_retry_after(self):
         from src.spotify_worker import SpotifyWorker
 
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
+        client = MagicMock()
 
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         worker._rate_limited_until = 130.0
 
         with patch("src.spotify_worker.time.monotonic", return_value=120.0):
             worker._poll_once()
 
-        mock_get.assert_not_called()
+        client.get.assert_not_called()
 
     @patch("src.spotify_worker.logging.warning")
-    @patch("src.spotify_worker.httpx.get")
-    def test_429_logs_retry_after(self, mock_get, log_warning):
+    def test_429_logs_retry_after(self, log_warning):
         from src.spotify_worker import SpotifyWorker
 
-        mock_get.return_value = MagicMock(
+        client = MagicMock()
+        client.get.return_value = MagicMock(
             status_code=429,
             text="",
             headers={"Retry-After": "15"},
         )
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
 
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         worker._poll_once()
 
         log_warning.assert_called()
 
 
 class TestSpotifyWorkerIdleResponse:
-    @patch("src.spotify_worker.httpx.get")
-    def test_204_emits_not_playing_and_resets_previous_state(self, mock_get):
+    def test_204_emits_not_playing_and_resets_previous_state(self):
         from src.spotify_worker import SpotifyWorker
 
-        mock_get.return_value = MagicMock(status_code=204, text="")
+        client = MagicMock()
+        client.get.return_value = MagicMock(status_code=204, text="")
 
-        mock_config = MagicMock()
-        mock_config.token_expires_at = int(time.time()) + 3600
-        mock_config.access_token = "valid"
-
-        worker = SpotifyWorker(mock_config)
+        worker = SpotifyWorker(_make_config(), http_client=client)
         worker._previous_state = PlayerState(
             track_id="old",
             track_name="Old Song",
@@ -360,3 +343,54 @@ class TestSpotifyWorkerIdleResponse:
 
         assert signals == ["not_playing"]
         assert worker._previous_state is None
+
+
+class TestSpotifyWorkerHttpClient:
+    @patch("src.spotify_worker.httpx.Client")
+    def test_default_worker_reuses_one_client_across_polls(self, client_class):
+        from src.spotify_worker import SpotifyWorker
+
+        client = client_class.return_value
+        client.get.return_value = MagicMock(status_code=204, text="")
+
+        worker = SpotifyWorker(_make_config())
+        worker._poll_once()
+        worker._poll_once()
+
+        client_class.assert_called_once()
+        assert client.get.call_count == 2
+
+
+class TestSpotifyWorkerPollingInterval:
+    def test_204_idle_response_uses_slower_poll_interval(self):
+        from src.spotify_worker import IDLE_POLL_INTERVAL_MS, SpotifyWorker
+
+        client = MagicMock()
+        client.get.return_value = MagicMock(status_code=204, text="")
+        worker = SpotifyWorker(_make_config(), http_client=client)
+
+        worker._poll_once()
+
+        assert worker._next_sleep_ms() == IDLE_POLL_INTERVAL_MS
+
+    def test_playing_track_keeps_fast_poll_interval(self):
+        from src.spotify_worker import PLAYING_POLL_INTERVAL_MS, SpotifyWorker
+
+        client = MagicMock()
+        client.get.return_value = _track_response(is_playing=True)
+        worker = SpotifyWorker(_make_config(), http_client=client)
+
+        worker._poll_once()
+
+        assert worker._next_sleep_ms() == PLAYING_POLL_INTERVAL_MS
+
+    def test_paused_track_uses_slower_poll_interval(self):
+        from src.spotify_worker import IDLE_POLL_INTERVAL_MS, SpotifyWorker
+
+        client = MagicMock()
+        client.get.return_value = _track_response(is_playing=False)
+        worker = SpotifyWorker(_make_config(), http_client=client)
+
+        worker._poll_once()
+
+        assert worker._next_sleep_ms() == IDLE_POLL_INTERVAL_MS
