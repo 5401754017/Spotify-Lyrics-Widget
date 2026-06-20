@@ -44,9 +44,9 @@ WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
-CONTROL_SLOT_WIDTH = 16
-CONTROL_SLOT_HEIGHT = 16
-CONTROL_GAP = 0
+CONTROL_SLOT_WIDTH = 12
+CONTROL_SLOT_HEIGHT = 12
+CONTROL_GAP = 2
 HOVER_CONTROL_COUNT = 3
 TOP_ROW_RIGHT_RESERVE = (
     CONTROL_SLOT_WIDTH * HOVER_CONTROL_COUNT
@@ -94,10 +94,10 @@ SIZE_PRESETS = {
         4,
         10,
         204,
-        32,
-        16,
-        16,
-        0,
+        40,
+        12,
+        12,
+        2,
         6,
         8,
         10,
@@ -117,10 +117,10 @@ SIZE_PRESETS = {
         5,
         13,
         242,
-        32,
-        16,
-        16,
-        0,
+        40,
+        12,
+        12,
+        2,
         9,
         9,
         13,
@@ -140,10 +140,10 @@ SIZE_PRESETS = {
         8,
         16,
         288,
-        32,
-        16,
-        16,
-        0,
+        40,
+        12,
+        12,
+        2,
         10,
         10,
         16,
@@ -220,9 +220,11 @@ class HoverIconButton(QPushButton):
             )
 
     def _paint_settings_icon(self, painter: QPainter, center: QPointF, icon_side: float):
+        color = painter.pen().color()
         outer_radius = icon_side * 0.48
-        inner_tooth_radius = icon_side * 0.38
+        inner_tooth_radius = icon_side * 0.36
         path = QPainterPath()
+        path.setFillRule(Qt.FillRule.OddEvenFill)
 
         for index in range(16):
             angle = -math.pi / 2 + index * math.pi / 8
@@ -237,9 +239,8 @@ class HoverIconButton(QPushButton):
                 path.lineTo(point)
         path.closeSubpath()
 
-        painter.drawPath(path)
-        hole_radius = icon_side * 0.14
-        painter.drawEllipse(
+        hole_radius = icon_side * 0.2
+        path.addEllipse(
             QRectF(
                 center.x() - hole_radius,
                 center.y() - hole_radius,
@@ -247,6 +248,9 @@ class HoverIconButton(QPushButton):
                 hole_radius * 2,
             )
         )
+        painter.setPen(Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        painter.drawPath(path)
 
 
 class LyricsWidget(QWidget):
@@ -466,6 +470,8 @@ class LyricsWidget(QWidget):
     def set_lyrics(self, lyrics: list[tuple[int, str]]):
         self._lyrics = lyrics
         self._current_line_idx = -1
+        if not self._is_playing:
+            self._update_lyric_display(self._last_synced_ms)
 
     def set_lyric_text(self, text: str):
         width = max(self._lyric_label.width(), self.width() - 32, 1)

@@ -1,9 +1,9 @@
 import time
 
 from PyQt6.QtCore import Qt
-from PyQt6.QtGui import QCloseEvent, QFont, QPalette
+from PyQt6.QtGui import QColor, QCloseEvent, QFont, QImage, QPainter, QPalette
 
-from src.widget import LyricsWidget
+from src.widget import HoverIconButton, LyricsWidget
 
 
 def test_widget_creates_without_crash(qtbot):
@@ -304,6 +304,16 @@ def test_resync_not_playing_stops_ui_timer(qtbot):
     assert not widget._ui_timer.isActive()
 
 
+def test_set_lyrics_updates_current_line_when_paused(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.resync_local_timer(7000, False, time.monotonic())
+
+    widget.set_lyrics([(5000, "Line 1"), (10000, "Line 2")])
+
+    assert widget._lyric_label.text() == "Line 1"
+
+
 def test_show_not_playing_stops_ui_timer(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
@@ -468,12 +478,12 @@ def test_hover_control_spacing_matches_compact_layout(qtbot):
             + close.width()
         )
 
-        assert title_gap == 32
-        assert settings_hide_gap == 0
-        assert hide_close_gap == 0
+        assert title_gap == 40
+        assert settings_hide_gap == 2
+        assert hide_close_gap == 2
         assert right_reserve == 80
         assert settings.size() == hide.size() == close.size()
-        assert settings.width() == 16
+        assert settings.width() == 12
 
 
 def test_hover_icons_fill_smaller_buttons(qtbot):
@@ -485,6 +495,24 @@ def test_hover_icons_fill_smaller_buttons(qtbot):
     assert widget._settings_btn.icon_fill_ratio == 0.86
     assert widget._hide_btn.icon_fill_ratio == 0.86
     assert widget._close_btn.icon_fill_ratio == 0.86
+
+
+def test_settings_icon_has_single_filled_shape_with_open_center(qtbot):
+    button = HoverIconButton("settings")
+    qtbot.addWidget(button)
+    button.setStyleSheet(
+        "QPushButton { background: transparent; border: none; padding: 0; margin: 0; }"
+    )
+    button.resize(12, 12)
+
+    image = QImage(12, 12, QImage.Format.Format_ARGB32)
+    image.fill(0)
+    painter = QPainter(image)
+    button.render(painter)
+    painter.end()
+
+    assert QColor(image.pixelColor(6, 6)).alpha() < 20
+    assert QColor(image.pixelColor(6, 2)).alpha() > 160
 
 
 def test_hover_controls_align_with_title_row_height(qtbot):
