@@ -371,7 +371,7 @@ def test_rate_limited_state_uses_fixed_layout(qtbot):
     assert "rate limited" in widget._lyric_label.text()
 
 
-def test_transport_controls_are_hover_only_and_do_not_move_title(qtbot):
+def test_hover_controls_are_hover_only_and_do_not_move_title(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -381,42 +381,26 @@ def test_transport_controls_are_hover_only_and_do_not_move_title(qtbot):
     widget.update_track_info("A very long song title that needs eliding", "Artist")
 
     title_before = widget._track_label.geometry()
-    assert not widget._controls_cluster.isVisible()
+    assert not widget._settings_btn.isVisible()
+    assert not widget._hide_btn.isVisible()
+    assert not widget._close_btn.isVisible()
 
     widget._on_enter_hover()
     title_hover = widget._track_label.geometry()
 
-    assert widget._controls_cluster.isVisible()
+    assert widget._settings_btn.isVisible()
+    assert widget._hide_btn.isVisible()
+    assert widget._close_btn.isVisible()
     assert title_hover == title_before
 
     widget._on_leave_hover()
-    assert not widget._controls_cluster.isVisible()
+    assert not widget._settings_btn.isVisible()
+    assert not widget._hide_btn.isVisible()
+    assert not widget._close_btn.isVisible()
     assert widget._track_label.geometry() == title_before
 
 
-def test_transport_controls_sit_between_title_and_close_slots(qtbot):
-    from src.widget import CONTROLS_CLUSTER_WIDTH, LyricsWidget
-
-    widget = LyricsWidget()
-    qtbot.addWidget(widget)
-    widget.show()
-    qtbot.waitExposed(widget)
-    widget._on_enter_hover()
-
-    controls = widget._controls_cluster.geometry()
-    close = widget._close_btn.geometry()
-    title_right = widget._track_label.mapTo(
-        widget._panel,
-        widget._track_label.rect().topRight(),
-    ).x()
-
-    assert title_right < controls.left()
-    assert controls.width() == CONTROLS_CLUSTER_WIDTH
-    assert close.left() >= 360
-    assert controls.right() < close.left()
-
-
-def test_transport_controls_align_with_title_row_height(qtbot):
+def test_hover_controls_sit_after_title_slot(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -425,7 +409,29 @@ def test_transport_controls_align_with_title_row_height(qtbot):
     qtbot.waitExposed(widget)
     widget._on_enter_hover()
 
-    controls_y = widget._controls_cluster.geometry().top()
+    settings = widget._settings_btn.geometry()
+    hide = widget._hide_btn.geometry()
+    close = widget._close_btn.geometry()
+    title_right = widget._track_label.mapTo(
+        widget._panel,
+        widget._track_label.rect().topRight(),
+    ).x()
+
+    assert title_right < settings.left()
+    assert settings.right() < hide.left()
+    assert hide.right() < close.left()
+
+
+def test_hover_controls_align_with_title_row_height(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+    widget._on_enter_hover()
+
+    controls_y = widget._settings_btn.geometry().top()
     title_y = widget._track_label.mapTo(
         widget._panel,
         widget._track_label.rect().topLeft(),
@@ -434,7 +440,7 @@ def test_transport_controls_align_with_title_row_height(qtbot):
     assert controls_y == title_y
 
 
-def test_title_label_elides_before_transport_controls_slot(qtbot):
+def test_title_label_elides_before_hover_controls_slot(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
@@ -447,36 +453,34 @@ def test_title_label_elides_before_transport_controls_slot(qtbot):
         widget._track_label.rect().topRight(),
     ).x()
 
-    assert title_right < widget._controls_cluster.geometry().left()
+    assert title_right < widget._settings_btn.geometry().left()
 
 
-def test_play_pause_button_reflects_playing_state(qtbot):
+def test_hide_button_emits_hide_requested(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
-    widget.set_playing(True)
-    assert widget._play_pause_btn.mode == "pause"
-
-    widget.set_playing(False)
-    assert widget._play_pause_btn.mode == "play"
+    with qtbot.waitSignal(widget.hide_requested, timeout=1000):
+        widget._hide_btn.click()
 
 
-def test_transport_buttons_emit_widget_level_signals(qtbot):
+def test_settings_menu_emits_size_preset_requested(qtbot):
     from src.widget import LyricsWidget
 
     widget = LyricsWidget()
     qtbot.addWidget(widget)
 
-    with qtbot.waitSignal(widget.prev_clicked, timeout=1000):
-        widget._prev_btn.click()
+    medium_action = next(
+        action for action in widget._size_menu.actions()
+        if action.data() == "medium"
+    )
 
-    with qtbot.waitSignal(widget.play_pause_clicked, timeout=1000):
-        widget._play_pause_btn.click()
+    with qtbot.waitSignal(widget.size_preset_requested, timeout=1000) as blocker:
+        medium_action.trigger()
 
-    with qtbot.waitSignal(widget.next_clicked, timeout=1000):
-        widget._next_btn.click()
+    assert blocker.args == ["medium"]
 
 
 def test_hover_starts_and_stops_title_marquee(qtbot):
@@ -581,7 +585,7 @@ def test_widget_small_clamps_lyric_to_two_lines(qtbot):
     assert widget._max_lyric_visual_lines == 2
 
 
-def test_size_preset_keeps_title_before_controls(qtbot):
+def test_size_preset_keeps_title_before_hover_controls(qtbot):
     from src.widget import SIZE_PRESETS, LyricsWidget
 
     widget = LyricsWidget()
@@ -596,8 +600,6 @@ def test_size_preset_keeps_title_before_controls(qtbot):
             widget._panel,
             widget._track_label.rect().topRight(),
         ).x()
-        assert title_right < widget._controls_cluster.geometry().left()
-        assert (
-            widget._controls_cluster.geometry().right()
-            < widget._close_btn.geometry().left()
-        )
+        assert title_right < widget._settings_btn.geometry().left()
+        assert widget._settings_btn.geometry().right() < widget._hide_btn.geometry().left()
+        assert widget._hide_btn.geometry().right() < widget._close_btn.geometry().left()
