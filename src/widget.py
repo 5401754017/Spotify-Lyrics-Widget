@@ -1,17 +1,21 @@
 import ctypes
 from dataclasses import dataclass
 import logging
+import math
 import sys
 import time
 
-from PyQt6.QtCore import QPoint, Qt, QTimer, pyqtSignal
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
     QColor,
     QCloseEvent,
     QEnterEvent,
     QFont,
     QMouseEvent,
+    QPainter,
+    QPainterPath,
     QPalette,
+    QPen,
 )
 from PyQt6.QtWidgets import (
     QFrame,
@@ -40,9 +44,9 @@ WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
 TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
-CONTROL_SLOT_WIDTH = 22
-CONTROL_SLOT_HEIGHT = 22
-CONTROL_GAP = 6
+CONTROL_SLOT_WIDTH = 20
+CONTROL_SLOT_HEIGHT = 20
+CONTROL_GAP = 4
 HOVER_CONTROL_COUNT = 3
 TOP_ROW_RIGHT_RESERVE = (
     CONTROL_SLOT_WIDTH * HOVER_CONTROL_COUNT
@@ -90,10 +94,10 @@ SIZE_PRESETS = {
         4,
         10,
         204,
-        8,
+        12,
+        20,
         18,
-        18,
-        5,
+        4,
         6,
         8,
         10,
@@ -113,10 +117,10 @@ SIZE_PRESETS = {
         5,
         13,
         242,
-        11,
+        12,
+        20,
         19,
-        19,
-        6,
+        4,
         9,
         9,
         13,
@@ -136,10 +140,10 @@ SIZE_PRESETS = {
         8,
         16,
         288,
-        14,
+        12,
         20,
         20,
-        7,
+        4,
         10,
         10,
         16,
@@ -155,6 +159,93 @@ _DWMWCP_ROUND = 2
 _DWMWA_BORDER_COLOR = 34
 # Spotify green (#1DB954) as a Win32 COLORREF (0x00BBGGRR)
 _DWM_BORDER_COLOR = 0x0054B91D
+
+
+class HoverIconButton(QPushButton):
+    def __init__(self, icon_name: str, parent=None):
+        super().__init__("", parent)
+        self.icon_name = icon_name
+        self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setVisible(False)
+
+    def enterEvent(self, event: QEnterEvent):
+        self.update()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        self.update()
+        super().leaveEvent(event)
+
+    def paintEvent(self, event):
+        super().paintEvent(event)
+
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        color = QColor(SPOTIFY_GREEN if self.underMouse() else WHITE)
+        pen_width = max(1.3, min(self.width(), self.height()) * 0.08)
+        painter.setPen(
+            QPen(
+                color,
+                pen_width,
+                Qt.PenStyle.SolidLine,
+                Qt.PenCapStyle.RoundCap,
+                Qt.PenJoinStyle.RoundJoin,
+            )
+        )
+        painter.setBrush(Qt.BrushStyle.NoBrush)
+
+        side = min(self.width(), self.height())
+        icon_side = side * 0.62
+        center = QPointF(self.width() / 2, self.height() / 2)
+
+        if self.icon_name == "settings":
+            self._paint_settings_icon(painter, center, icon_side)
+        elif self.icon_name == "hide":
+            half = icon_side * 0.42
+            painter.drawLine(
+                QPointF(center.x() - half, center.y()),
+                QPointF(center.x() + half, center.y()),
+            )
+        elif self.icon_name == "close":
+            half = icon_side * 0.36
+            painter.drawLine(
+                QPointF(center.x() - half, center.y() - half),
+                QPointF(center.x() + half, center.y() + half),
+            )
+            painter.drawLine(
+                QPointF(center.x() + half, center.y() - half),
+                QPointF(center.x() - half, center.y() + half),
+            )
+
+    def _paint_settings_icon(self, painter: QPainter, center: QPointF, icon_side: float):
+        outer_radius = icon_side * 0.48
+        inner_tooth_radius = icon_side * 0.38
+        path = QPainterPath()
+
+        for index in range(16):
+            angle = -math.pi / 2 + index * math.pi / 8
+            radius = outer_radius if index % 2 == 0 else inner_tooth_radius
+            point = QPointF(
+                center.x() + math.cos(angle) * radius,
+                center.y() + math.sin(angle) * radius,
+            )
+            if index == 0:
+                path.moveTo(point)
+            else:
+                path.lineTo(point)
+        path.closeSubpath()
+
+        painter.drawPath(path)
+        hole_radius = icon_side * 0.14
+        painter.drawEllipse(
+            QRectF(
+                center.x() - hole_radius,
+                center.y() - hole_radius,
+                hole_radius * 2,
+                hole_radius * 2,
+            )
+        )
 
 
 class LyricsWidget(QWidget):
@@ -263,16 +354,12 @@ class LyricsWidget(QWidget):
         )
         self._top_row_layout.addWidget(self._track_label, stretch=1)
 
-        def make_control_button(text: str) -> QPushButton:
-            button = QPushButton(text, self._panel)
-            button.setMouseTracking(True)
-            button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-            button.setVisible(False)
-            return button
+        def make_control_button(icon_name: str) -> HoverIconButton:
+            return HoverIconButton(icon_name, self._panel)
 
-        self._settings_btn = make_control_button("⚙")
-        self._hide_btn = make_control_button("-")
-        self._close_btn = make_control_button("×")
+        self._settings_btn = make_control_button("settings")
+        self._hide_btn = make_control_button("hide")
+        self._close_btn = make_control_button("close")
 
         self._size_menu = QMenu(self)
         for label, value in (("Small", "small"), ("Medium", "medium"), ("Large", "large")):

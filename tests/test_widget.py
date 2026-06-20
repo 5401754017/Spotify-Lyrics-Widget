@@ -422,6 +422,50 @@ def test_hover_controls_sit_after_title_slot(qtbot):
     assert hide.right() < close.left()
 
 
+def test_hover_controls_use_textless_line_icons(qtbot):
+    from src.widget import LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+
+    assert widget._settings_btn.text() == ""
+    assert widget._hide_btn.text() == ""
+    assert widget._close_btn.text() == ""
+    assert widget._settings_btn.icon_name == "settings"
+    assert widget._hide_btn.icon_name == "hide"
+    assert widget._close_btn.icon_name == "close"
+
+
+def test_hover_control_spacing_matches_compact_layout(qtbot):
+    from src.widget import SIZE_PRESETS, LyricsWidget
+
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.show()
+    qtbot.waitExposed(widget)
+
+    for name in SIZE_PRESETS:
+        widget.apply_size_preset(name)
+        widget._on_enter_hover()
+
+        settings = widget._settings_btn.geometry()
+        hide = widget._hide_btn.geometry()
+        close = widget._close_btn.geometry()
+        title_right = widget._track_label.mapTo(
+            widget._panel,
+            widget._track_label.rect().topRight(),
+        ).x()
+
+        title_gap = settings.left() - title_right - 1
+        settings_hide_gap = hide.left() - settings.right() - 1
+        hide_close_gap = close.left() - hide.right() - 1
+
+        assert title_gap >= 12
+        assert settings_hide_gap == 4
+        assert hide_close_gap == 4
+        assert settings.size() == hide.size() == close.size()
+
+
 def test_hover_controls_align_with_title_row_height(qtbot):
     from src.widget import LyricsWidget
 
