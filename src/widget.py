@@ -46,7 +46,7 @@ TOP_ROW_HEIGHT = 24
 LYRIC_LANE_HEIGHT = 56
 CONTROL_SLOT_WIDTH = 20
 CONTROL_SLOT_HEIGHT = 20
-CONTROL_GAP = 2
+CONTROL_GAP = 0
 HOVER_CONTROL_COUNT = 3
 TOP_ROW_RIGHT_RESERVE = (
     CONTROL_SLOT_WIDTH * HOVER_CONTROL_COUNT
@@ -94,10 +94,10 @@ SIZE_PRESETS = {
         4,
         10,
         204,
-        16,
+        20,
         20,
         18,
-        2,
+        0,
         6,
         8,
         10,
@@ -117,10 +117,10 @@ SIZE_PRESETS = {
         5,
         13,
         242,
-        16,
+        20,
         20,
         19,
-        2,
+        0,
         9,
         9,
         13,
@@ -140,10 +140,10 @@ SIZE_PRESETS = {
         8,
         16,
         288,
-        16,
         20,
         20,
-        2,
+        20,
+        0,
         10,
         10,
         16,

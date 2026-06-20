@@ -468,9 +468,9 @@ def test_hover_control_spacing_matches_compact_layout(qtbot):
             + close.width()
         )
 
-        assert title_gap == 16
-        assert settings_hide_gap == 2
-        assert hide_close_gap == 2
+        assert title_gap == 20
+        assert settings_hide_gap == 0
+        assert hide_close_gap == 0
         assert right_reserve == 80
         assert settings.size() == hide.size() == close.size()
 
