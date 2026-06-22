@@ -81,6 +81,18 @@ taskbar 右鍵 Close window
 如果實測發現最小化 host 會閃出空白窗，就改成第二方案：host 還原時顯示一個小型
 控制窗，只放 `Show Widget` 和 `Quit`。這比較像一般 app，但會多一個可見視窗。
 
+## 備選方案與切換條件
+
+第一輪 implementation plan 只實作方案 A。方案 B 先保留在 spec 裡，不和第一輪混在
+同一個 commit 或同一個實作 plan，避免同時調整兩種 taskbar 行為。
+
+| 方案 | 行為 | 使用條件 |
+| --- | --- | --- |
+| A. 最小化 taskbar host | Host 啟動後 `showMinimized()`，點 taskbar 時叫回 widget，再重新最小化。 | 第一輪預設方案。若 taskbar entry 穩定保留，而且點擊時沒有明顯空白窗閃爍，就保留。 |
+| B. 小型狀態窗 host | 點 taskbar 時開一個小控制窗，提供 `Show Widget`、`Quit`，widget 仍是浮動小工具。 | 只有當方案 A 在 Windows 實測失敗時才做：例如 taskbar entry 不穩、空白窗閃爍明顯，或 Alt+Tab/taskbar 行為讓人困惑。 |
+
+若方案 A 不符合手動 QA，停止在該輪工作並記錄失敗現象；方案 B 另開後續 plan/對話處理。
+
 ## Windows App ID
 
 Windows taskbar 的 icon、分組、shortcut 關聯常依賴 AppUserModelID。啟動時應在建立
