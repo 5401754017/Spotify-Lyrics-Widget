@@ -17,10 +17,12 @@ def _make_app():
         "user-read-playback-state"
     )
     widget = MagicMock()
+    taskbar_host = MagicMock()
 
     with (
         patch("src.main.Config", return_value=config),
         patch("src.main.LyricsWidget", return_value=widget),
+        patch("src.main.TaskbarHostWindow", return_value=taskbar_host),
         patch("src.main.SpotifyWorker", return_value=MagicMock()),
         patch("src.main.LyricsWorker", return_value=MagicMock()),
     ):
@@ -107,11 +109,15 @@ def test_start_does_not_start_ui_timer_until_playback_sync():
     app._spotify_worker.start.assert_called_once()
 
 
-def test_main_configures_logging_before_starting_qapplication():
+def test_main_configures_logging_and_app_id_before_starting_qapplication():
     events = []
 
     with (
         patch("src.main.configure_logging", side_effect=lambda: events.append("log")),
+        patch(
+            "src.main.set_windows_app_user_model_id",
+            side_effect=lambda: events.append("appid"),
+        ),
         patch("src.main.QApplication", side_effect=lambda argv: events.append("qt") or MagicMock(exec=lambda: 0)),
         patch("src.main.build_app_icon"),
         patch("src.main.load_app_font"),
@@ -122,7 +128,7 @@ def test_main_configures_logging_before_starting_qapplication():
         guard_class.return_value.try_claim.return_value = False
         main_module.main()
 
-    assert events[:2] == ["log", "qt"]
+    assert events[:3] == ["log", "appid", "qt"]
 
 
 def test_main_loads_font_before_building_app():
@@ -302,12 +308,59 @@ def test_widget_close_request_quits_qapplication():
         patch("src.main.QApplication.instance", return_value=fake_qapp),
         patch("src.main.Config", return_value=MagicMock(refresh_token="refresh")),
         patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
         patch("src.main.SpotifyWorker", return_value=MagicMock()),
         patch("src.main.LyricsWorker", return_value=MagicMock()),
     ):
         app = App()
 
     app._widget.close_requested.connect.assert_called_once_with(fake_qapp.quit)
+
+
+def test_app_connects_taskbar_host_to_raise_window_and_quit():
+    fake_qapp = MagicMock()
+    taskbar_host = MagicMock()
+
+    with (
+        patch("src.main.QApplication.instance", return_value=fake_qapp),
+        patch("src.main.Config", return_value=MagicMock(refresh_token="refresh")),
+        patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.TaskbarHostWindow", return_value=taskbar_host),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock()),
+    ):
+        app = App()
+
+    taskbar_host.activated.connect.assert_called_once_with(app.raise_window)
+    taskbar_host.close_requested.connect.assert_called_once_with(fake_qapp.quit)
+
+
+def test_start_shows_taskbar_entry():
+    app, config, _ = _make_app()
+    config.client_id = "client"
+    config.size_preset = "large"
+    app._ensure_auth = MagicMock(return_value=True)
+    qapp = MagicMock()
+
+    with (
+        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.TrayIcon"),
+    ):
+        app.start()
+
+    app._taskbar_host.show_taskbar_entry.assert_called_once()
+
+
+def test_shutdown_hides_taskbar_host():
+    app, _, widget = _make_app()
+    fresh_config = MagicMock()
+    widget.pos.return_value.x.return_value = 321
+    widget.pos.return_value.y.return_value = 654
+
+    with patch("src.main.Config", return_value=fresh_config):
+        app.shutdown()
+
+    app._taskbar_host.hide.assert_called_once()
 
 
 def test_shutdown_reloads_config_before_saving_window_position():
@@ -322,6 +375,7 @@ def test_shutdown_reloads_config_before_saving_window_position():
     with (
         patch("src.main.Config", side_effect=[initial_config, fresh_config]),
         patch("src.main.LyricsWidget", return_value=widget),
+        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
         patch("src.main.SpotifyWorker", return_value=MagicMock()),
         patch("src.main.LyricsWorker", return_value=MagicMock()),
     ):
@@ -347,6 +401,7 @@ def test_shutdown_stops_workers_before_exit():
     with (
         patch("src.main.Config", side_effect=[config, fresh_config]),
         patch("src.main.LyricsWidget", return_value=widget),
+        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
         patch("src.main.SpotifyWorker", return_value=spotify_worker),
         patch("src.main.LyricsWorker", return_value=lyrics_worker),
     ):
@@ -368,6 +423,7 @@ def test_shutdown_hides_tray_before_exit():
     with (
         patch("src.main.Config", side_effect=[config, fresh_config]),
         patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
         patch("src.main.SpotifyWorker", return_value=MagicMock()),
         patch("src.main.LyricsWorker", return_value=MagicMock(isRunning=lambda: False)),
     ):
@@ -506,6 +562,7 @@ def test_app_applies_config_size_preset_on_init():
     with (
         patch("src.main.Config", return_value=config),
         patch("src.main.LyricsWidget", return_value=widget),
+        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
         patch("src.main.SpotifyWorker", return_value=MagicMock()),
         patch("src.main.LyricsWorker", return_value=MagicMock()),
     ):

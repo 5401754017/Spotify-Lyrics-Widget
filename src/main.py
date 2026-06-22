@@ -21,8 +21,10 @@ from src.logging_setup import configure_logging
 from src.lyrics_worker import LyricsWorker, TrackInfo
 from src.onboarding import SpotifyOnboardingDialog
 from src.spotify_worker import PlayerState, SpotifyWorker
+from src.taskbar_host import TaskbarHostWindow
 from src.tray import TrayIcon
 from src.widget import LyricsWidget
+from src.windows_app_id import set_windows_app_user_model_id
 
 
 INSTANCE_SERVER_NAME = "spotify-lyrics-widget"
@@ -101,15 +103,18 @@ class App(QObject):
         self._lyrics_worker = LyricsWorker(netease_fallback=self._config.netease_fallback)
         self._current_track_id: str | None = None
         self._tray: TrayIcon | None = None
+        self._taskbar_host = TaskbarHostWindow()
         self._last_heartbeat_ts: float = 0.0
         self._is_playing = False
         self._widget.apply_size_preset(self._config.size_preset)
         self._connect_lifecycle_signals()
 
     def _connect_lifecycle_signals(self):
+        self._taskbar_host.activated.connect(self.raise_window)
         app = QApplication.instance()
         if app is not None:
             self._widget.close_requested.connect(app.quit)
+            self._taskbar_host.close_requested.connect(app.quit)
 
     def start(self):
         if not self._config.client_id:
@@ -125,6 +130,7 @@ class App(QObject):
         self._connect_signals()
         self._widget.move(self._config.window_x, self._config.window_y)
         self._widget.show()
+        self._taskbar_host.show_taskbar_entry()
         app = QApplication.instance()
         self._tray = TrayIcon(
             on_toggle=self._toggle_widget,
@@ -290,6 +296,7 @@ class App(QObject):
         logging.info("App.shutdown called — event loop is exiting")
         if self._tray is not None:
             self._tray.hide()
+        self._taskbar_host.hide()
         position = self._widget.pos()
         config = Config(config_dir=self._config.config_dir)
         config.window_x = position.x()
@@ -304,6 +311,7 @@ class App(QObject):
 
 def main():
     configure_logging()
+    set_windows_app_user_model_id()
     app = QApplication(sys.argv)
     app.setApplicationName("Spotify Lyrics Widget")
     app.setWindowIcon(build_app_icon())
