@@ -281,16 +281,28 @@ def test_start_creates_and_shows_tray():
     tray.show.assert_called_once()
 
 
-def test_toggle_widget_hides_when_visible():
+def test_raise_window_marks_taskbar_host_widget_visible():
+    app, _, widget = _make_app()
+
+    app.raise_window()
+
+    widget.showNormal.assert_called_once()
+    widget.raise_.assert_called_once()
+    widget.activateWindow.assert_called_once()
+    app._taskbar_host.set_widget_visible.assert_called_once_with(True)
+
+
+def test_toggle_widget_hides_and_updates_taskbar_host_when_visible():
     app, _, widget = _make_app()
     widget.isVisible.return_value = True
 
     app._toggle_widget()
 
     widget.hide.assert_called_once()
+    app._taskbar_host.set_widget_visible.assert_called_once_with(False)
 
 
-def test_toggle_widget_raises_when_hidden():
+def test_toggle_widget_raises_and_updates_taskbar_host_when_hidden():
     app, _, widget = _make_app()
     widget.isVisible.return_value = False
 
@@ -299,6 +311,7 @@ def test_toggle_widget_raises_when_hidden():
     widget.showNormal.assert_called_once()
     widget.raise_.assert_called_once()
     widget.activateWindow.assert_called_once()
+    app._taskbar_host.set_widget_visible.assert_called_once_with(True)
 
 
 def test_widget_close_request_quits_qapplication():
@@ -317,7 +330,7 @@ def test_widget_close_request_quits_qapplication():
     app._widget.close_requested.connect.assert_called_once_with(fake_qapp.quit)
 
 
-def test_app_connects_taskbar_host_to_raise_window_and_quit():
+def test_app_connects_taskbar_host_controls_to_toggle_and_quit():
     fake_qapp = MagicMock()
     taskbar_host = MagicMock()
 
@@ -331,11 +344,13 @@ def test_app_connects_taskbar_host_to_raise_window_and_quit():
     ):
         app = App()
 
-    taskbar_host.activated.connect.assert_called_once_with(app.raise_window)
-    taskbar_host.close_requested.connect.assert_called_once_with(fake_qapp.quit)
+    taskbar_host.toggle_widget_requested.connect.assert_called_once_with(
+        app._toggle_widget
+    )
+    taskbar_host.quit_requested.connect.assert_called_once_with(fake_qapp.quit)
 
 
-def test_start_shows_taskbar_entry():
+def test_start_shows_taskbar_entry_and_marks_widget_visible():
     app, config, _ = _make_app()
     config.client_id = "client"
     config.size_preset = "large"
@@ -348,6 +363,7 @@ def test_start_shows_taskbar_entry():
     ):
         app.start()
 
+    app._taskbar_host.set_widget_visible.assert_called_with(True)
     app._taskbar_host.show_taskbar_entry.assert_called_once()
 
 

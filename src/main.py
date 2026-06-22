@@ -110,11 +110,11 @@ class App(QObject):
         self._connect_lifecycle_signals()
 
     def _connect_lifecycle_signals(self):
-        self._taskbar_host.activated.connect(self.raise_window)
+        self._taskbar_host.toggle_widget_requested.connect(self._toggle_widget)
         app = QApplication.instance()
         if app is not None:
             self._widget.close_requested.connect(app.quit)
-            self._taskbar_host.close_requested.connect(app.quit)
+            self._taskbar_host.quit_requested.connect(app.quit)
 
     def start(self):
         if not self._config.client_id:
@@ -130,6 +130,7 @@ class App(QObject):
         self._connect_signals()
         self._widget.move(self._config.window_x, self._config.window_y)
         self._widget.show()
+        self._taskbar_host.set_widget_visible(True)
         self._taskbar_host.show_taskbar_entry()
         app = QApplication.instance()
         self._tray = TrayIcon(
@@ -267,10 +268,12 @@ class App(QObject):
         self._widget.showNormal()
         self._widget.raise_()
         self._widget.activateWindow()
+        self._taskbar_host.set_widget_visible(True)
 
     def _toggle_widget(self):
         if self._widget.isVisible():
             self._widget.hide()
+            self._taskbar_host.set_widget_visible(False)
         else:
             self.raise_window()
 
