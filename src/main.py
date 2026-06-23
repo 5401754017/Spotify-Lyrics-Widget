@@ -21,8 +21,10 @@ from src.logging_setup import configure_logging
 from src.lyrics_worker import LyricsWorker, TrackInfo
 from src.onboarding import SpotifyOnboardingDialog
 from src.spotify_worker import PlayerState, SpotifyWorker
+from src.taskbar_host import TaskbarHostWindow
 from src.tray import TrayIcon
 from src.widget import LyricsWidget
+from src.windows_app_id import set_windows_app_user_model_id
 
 
 INSTANCE_SERVER_NAME = "spotify-lyrics-widget"
@@ -91,47 +93,44 @@ class SingleInstanceGuard:
 
 
 class App(QObject):
-    """Main application controller for the V1 widget."""
+    """Main application controller for the widget and taskbar controller."""
 
     def __init__(self):
         super().__init__()
         self._config = Config()
-        self._widget = LyricsWidget()
-        self._spotify_worker = SpotifyWorker(self._config)
-        self._lyrics_worker = LyricsWorker(netease_fallback=self._config.netease_fallback)
+        self._widget: LyricsWidget | None = None
+        self._spotify_worker: SpotifyWorker | None = None
+        self._lyrics_worker: LyricsWorker | None = None
         self._current_track_id: str | None = None
         self._tray: TrayIcon | None = None
+        self._taskbar_host = TaskbarHostWindow()
         self._last_heartbeat_ts: float = 0.0
         self._is_playing = False
-        self._widget.apply_size_preset(self._config.size_preset)
-        self._connect_lifecycle_signals()
+        self._connect_controller_signals()
+        self._sync_controller_state()
 
-    def _connect_lifecycle_signals(self):
-        app = QApplication.instance()
-        if app is not None:
-            self._widget.close_requested.connect(app.quit)
+    def _connect_controller_signals(self):
+        self._taskbar_host.show_widget_requested.connect(self._show_widget)
+        self._taskbar_host.hide_widget_requested.connect(self._hide_widget)
+        self._taskbar_host.run_widget_requested.connect(self._run_widget)
+        self._taskbar_host.close_widget_requested.connect(self._close_widget)
+        self._taskbar_host.controller_close_requested.connect(self._close_controller)
 
     def start(self):
-        if not self._config.client_id:
-            dialog = SpotifyOnboardingDialog(REDIRECT_URI)
-            if dialog.exec() != QDialog.DialogCode.Accepted:
-                sys.exit(1)
-            self._config.client_id = dialog.client_id
-            self._config.save()
+        self._sync_controller_state()
+        self._taskbar_host.show_taskbar_entry()
+        self.show_controller()
 
-        if not self._ensure_auth():
-            sys.exit(1)
+    def _ensure_client_configured(self) -> bool:
+        if self._config.client_id:
+            return True
 
-        self._connect_signals()
-        self._widget.move(self._config.window_x, self._config.window_y)
-        self._widget.show()
-        app = QApplication.instance()
-        self._tray = TrayIcon(
-            on_toggle=self._toggle_widget,
-            on_quit=app.quit if app is not None else (lambda: None),
-        )
-        self._tray.show()
-        self._spotify_worker.start()
+        dialog = SpotifyOnboardingDialog(REDIRECT_URI)
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return False
+        self._config.client_id = dialog.client_id
+        self._config.save()
+        return True
 
     def _ensure_auth(self) -> bool:
         scopes_ok = has_required_scopes(self._config.granted_scope, SCOPES)
@@ -172,7 +171,14 @@ class App(QObject):
             self._config.granted_scope = result["scope"]
         self._config.save()
 
-    def _connect_signals(self):
+    def _connect_widget_session_signals(self):
+        if (
+            self._widget is None
+            or self._spotify_worker is None
+            or self._lyrics_worker is None
+        ):
+            raise RuntimeError("Widget session is not initialized")
+
         self._spotify_worker.track_changed.connect(self._on_track_changed)
         self._spotify_worker.state_synced.connect(self._on_state_synced)
         self._spotify_worker.playback_toggled.connect(self._on_playback_toggled)
@@ -183,6 +189,7 @@ class App(QObject):
         self._spotify_worker.network_recovered.connect(self._widget.hide_offline)
         self._spotify_worker.rate_limited.connect(self._widget.show_rate_limited)
         self._widget.hide_requested.connect(self._toggle_widget)
+        self._widget.close_requested.connect(self._close_widget)
         self._widget.size_preset_requested.connect(self._on_size_preset_changed)
 
         self._lyrics_worker.lyrics_ready.connect(self._on_lyrics_ready)
@@ -191,6 +198,8 @@ class App(QObject):
 
     @pyqtSlot(object)
     def _on_track_changed(self, state: PlayerState):
+        if self._widget is None or self._lyrics_worker is None:
+            return
         logging.info(
             "UI slot _on_track_changed fired: track_id=%s track=%s",
             state.track_id,
@@ -220,6 +229,8 @@ class App(QObject):
 
     @pyqtSlot(int, bool, float)
     def _on_state_synced(self, progress_ms: int, is_playing: bool, local_ts: float):
+        if self._widget is None:
+            return
         now = time.monotonic()
         if now - self._last_heartbeat_ts > 30:
             logging.info("UI heartbeat alive: progress=%s is_playing=%s", progress_ms, is_playing)
@@ -229,81 +240,184 @@ class App(QObject):
 
     @pyqtSlot(bool)
     def _on_playback_toggled(self, is_playing: bool):
+        if self._widget is None:
+            return
         self._is_playing = is_playing
         if not is_playing:
             self._widget.stop_ui_timer()
 
     @pyqtSlot()
     def _on_not_a_track(self):
+        if self._widget is None:
+            return
         self._widget.show_not_a_track()
         self._current_track_id = None
 
     @pyqtSlot()
     def _on_not_playing(self):
+        if self._widget is None:
+            return
         self._widget.show_not_playing()
         self._current_track_id = None
 
     @pyqtSlot()
     def _on_auth_expired(self):
+        if self._widget is None or self._spotify_worker is None:
+            return
         self._spotify_worker.stop()
         self._spotify_worker.wait(2000)
         if self._ensure_auth():
             self._spotify_worker = SpotifyWorker(self._config)
-            self._connect_signals()
+            self._connect_widget_session_signals()
             self._spotify_worker.start()
 
     def _on_size_preset_changed(self, preset: str):
+        if self._widget is None:
+            return
         self._widget.apply_size_preset(preset)
         self._config.size_preset = self._widget.size_preset
         self._config.save()
 
-    def raise_window(self):
+    def _sync_controller_state(self):
+        is_running = self._widget is not None
+        is_visible = bool(is_running and self._widget.isVisible())
+        self._taskbar_host.set_widget_state(
+            is_running=is_running,
+            is_visible=is_visible,
+        )
+
+    def _create_widget_session(self):
+        self._widget = LyricsWidget()
+        self._spotify_worker = SpotifyWorker(self._config)
+        self._lyrics_worker = LyricsWorker(netease_fallback=self._config.netease_fallback)
+        self._current_track_id = None
+        self._is_playing = False
+        self._widget.apply_size_preset(self._config.size_preset)
+        self._connect_widget_session_signals()
+
+    def _run_widget(self):
+        if self._widget is not None:
+            self._show_widget()
+            return
+        if not self._ensure_client_configured():
+            self._sync_controller_state()
+            return
+        if not self._ensure_auth():
+            self._sync_controller_state()
+            return
+
+        self._create_widget_session()
+        self._widget.move(self._config.window_x, self._config.window_y)
+        self._widget.show()
+        self._tray = TrayIcon(
+            on_toggle=self._toggle_widget,
+            on_close_widget=self._close_widget,
+        )
+        self._tray.show()
+        self._spotify_worker.start()
+        self._taskbar_host.set_widget_state(is_running=True, is_visible=True)
+
+    def _show_widget(self):
+        if self._widget is None:
+            return
         self._widget.showNormal()
         self._widget.raise_()
         self._widget.activateWindow()
+        self._taskbar_host.set_widget_state(is_running=True, is_visible=True)
+
+    def _hide_widget(self):
+        if self._widget is None:
+            return
+        self._widget.hide()
+        self._taskbar_host.set_widget_state(is_running=True, is_visible=False)
 
     def _toggle_widget(self):
+        if self._widget is None:
+            return
         if self._widget.isVisible():
-            self._widget.hide()
+            self._hide_widget()
         else:
-            self.raise_window()
+            self._show_widget()
+
+    def _save_widget_position(self, widget):
+        position = widget.pos()
+        config = Config(config_dir=self._config.config_dir)
+        config.window_x = position.x()
+        config.window_y = position.y()
+        config.size_preset = self._config.size_preset
+        config.save()
+
+    def _close_widget(self):
+        widget = self._widget
+        spotify_worker = self._spotify_worker
+        lyrics_worker = self._lyrics_worker
+        tray = self._tray
+
+        self._widget = None
+        self._spotify_worker = None
+        self._lyrics_worker = None
+        self._tray = None
+        self._current_track_id = None
+        self._is_playing = False
+
+        if tray is not None:
+            tray.hide()
+        if widget is not None:
+            self._save_widget_position(widget)
+            widget.hide()
+            widget.deleteLater()
+        if spotify_worker is not None:
+            spotify_worker.stop()
+            spotify_worker.wait(2000)
+        if lyrics_worker is not None and lyrics_worker.isRunning():
+            lyrics_worker.wait(6000)
+        self._taskbar_host.set_widget_state(is_running=False, is_visible=False)
+
+    def _close_controller(self):
+        self._close_widget()
+        self._taskbar_host.hide()
+        app = QApplication.instance()
+        if app is not None:
+            app.quit()
+
+    def show_controller(self):
+        self._taskbar_host.showNormal()
+        self._taskbar_host.raise_()
+        self._taskbar_host.activateWindow()
 
     @pyqtSlot(str, list)
     def _on_lyrics_ready(self, track_id: str, lyrics: list):
+        if self._widget is None:
+            return
         if track_id != self._current_track_id:
             return
         self._widget.set_lyrics(lyrics)
 
     @pyqtSlot(str)
     def _on_no_lyrics(self, track_id: str):
+        if self._widget is None:
+            return
         if track_id != self._current_track_id:
             return
         self._widget.show_no_lyrics()
 
     @pyqtSlot(str)
     def _on_lyrics_unavailable(self, track_id: str):
+        if self._widget is None:
+            return
         if track_id != self._current_track_id:
             return
         self._widget.show_unavailable()
 
     def shutdown(self):
-        logging.info("App.shutdown called — event loop is exiting")
-        if self._tray is not None:
-            self._tray.hide()
-        position = self._widget.pos()
-        config = Config(config_dir=self._config.config_dir)
-        config.window_x = position.x()
-        config.window_y = position.y()
-        config.size_preset = self._config.size_preset
-        config.save()
-        self._spotify_worker.stop()
-        self._spotify_worker.wait(2000)
-        if self._lyrics_worker.isRunning():
-            self._lyrics_worker.wait(6000)
+        logging.info("App.shutdown called - event loop is exiting")
+        self._close_widget()
+        self._taskbar_host.hide()
 
 
 def main():
     configure_logging()
+    set_windows_app_user_model_id()
     app = QApplication(sys.argv)
     app.setApplicationName("Spotify Lyrics Widget")
     app.setWindowIcon(build_app_icon())
@@ -312,7 +426,7 @@ def main():
     guard = None
     try:
         controller = App()
-        guard = SingleInstanceGuard(on_activate=controller.raise_window)
+        guard = SingleInstanceGuard(on_activate=controller.show_controller)
         if not guard.try_claim():
             sys.exit(0)
             return

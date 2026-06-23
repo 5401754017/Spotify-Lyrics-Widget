@@ -10,7 +10,7 @@ def _noop():
 def _make_tray(**overrides):
     callbacks = dict(
         on_toggle=_noop,
-        on_quit=_noop,
+        on_close_widget=_noop,
     )
     callbacks.update(overrides)
     return TrayIcon(**callbacks)
@@ -40,10 +40,10 @@ def test_double_click_does_not_call_on_toggle(qtbot):
     assert calls == []
 
 
-def test_menu_has_open_hide_and_quit(qtbot):
+def test_menu_has_open_hide_and_close_widget(qtbot):
     tray = _make_tray()
     labels = [action.text() for action in tray._menu.actions() if action.text()]
-    assert labels == ["Open / Hide", "Quit"]
+    assert labels == ["Open / Hide", "Close Widget"]
 
 
 def test_open_hide_menu_action_calls_on_toggle(qtbot):
@@ -59,14 +59,14 @@ def test_open_hide_menu_action_calls_on_toggle(qtbot):
     assert calls == ["toggle"]
 
 
-def test_quit_menu_action_calls_on_quit(qtbot):
+def test_close_widget_menu_action_calls_on_close_widget(qtbot):
     calls = []
-    tray = _make_tray(on_quit=lambda: calls.append("quit"))
+    tray = _make_tray(on_close_widget=lambda: calls.append("close"))
 
-    quit_action = next(
+    close_action = next(
         action for action in tray._menu.actions()
-        if action.text() == "Quit"
+        if action.text() == "Close Widget"
     )
-    quit_action.trigger()
+    close_action.trigger()
 
-    assert calls == ["quit"]
+    assert calls == ["close"]

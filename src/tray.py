@@ -12,7 +12,7 @@ class TrayIcon:
     def __init__(
         self,
         on_toggle,
-        on_quit,
+        on_close_widget,
         parent=None,
     ):
         self._on_toggle = on_toggle
@@ -21,7 +21,7 @@ class TrayIcon:
 
         self._menu = QMenu()
         self._menu.addAction("Open / Hide").triggered.connect(on_toggle)
-        self._menu.addAction("Quit").triggered.connect(on_quit)
+        self._menu.addAction("Close Widget").triggered.connect(on_close_widget)
         self._tray.setContextMenu(self._menu)
         self._tray.activated.connect(self._on_tray_activated)
 
