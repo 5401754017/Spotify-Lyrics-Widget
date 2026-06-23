@@ -5,45 +5,81 @@ from src.app_icon import build_app_icon
 
 
 class TaskbarHostWindow(QWidget):
-    toggle_widget_requested = pyqtSignal()
-    quit_requested = pyqtSignal()
+    show_widget_requested = pyqtSignal()
+    hide_widget_requested = pyqtSignal()
+    run_widget_requested = pyqtSignal()
+    close_widget_requested = pyqtSignal()
+    controller_close_requested = pyqtSignal()
 
     def __init__(self):
         super().__init__()
+        self._is_running = False
+        self._is_visible = False
+
         self.setWindowTitle("Spotify Lyrics Widget")
         self.setWindowIcon(build_app_icon())
-        self.resize(320, 140)
+        self.resize(360, 150)
 
         self._title_label = QLabel("Spotify Lyrics Widget")
-        self._status_label = QLabel()
-        self._toggle_button = QPushButton()
-        self._quit_button = QPushButton("Quit")
+        self._running_label = QLabel()
+        self._visibility_label = QLabel()
+        self._visibility_button = QPushButton()
+        self._run_close_button = QPushButton()
 
         button_layout = QHBoxLayout()
-        button_layout.addWidget(self._toggle_button)
-        button_layout.addWidget(self._quit_button)
+        button_layout.addWidget(self._visibility_button)
+        button_layout.addWidget(self._run_close_button)
 
         layout = QVBoxLayout()
         layout.addWidget(self._title_label)
-        layout.addWidget(self._status_label)
+        layout.addWidget(self._running_label)
+        layout.addWidget(self._visibility_label)
         layout.addLayout(button_layout)
         self.setLayout(layout)
 
-        self._toggle_button.clicked.connect(self.toggle_widget_requested.emit)
-        self._quit_button.clicked.connect(self.quit_requested.emit)
-        self.set_widget_visible(False)
+        self._visibility_button.clicked.connect(self._emit_visibility_request)
+        self._run_close_button.clicked.connect(self._emit_run_close_request)
+        self.set_widget_state(is_running=False, is_visible=False)
 
-    def set_widget_visible(self, is_visible: bool):
-        if is_visible:
-            self._status_label.setText("Widget: Visible")
-            self._toggle_button.setText("Hide Widget")
+    def set_widget_state(self, is_running: bool, is_visible: bool):
+        self._is_running = is_running
+        self._is_visible = is_visible if is_running else False
+        self._running_label.setText(
+            "Widget: Running" if self._is_running else "Widget: Stopped"
+        )
+        self._visibility_label.setText(
+            "Widget: Visible" if self._is_visible else "Widget: Hidden"
+        )
+
+        if not self._is_running:
+            self._visibility_button.setText("Widget Disabled")
+            self._visibility_button.setEnabled(False)
+            self._run_close_button.setText("Run Widget")
+            return
+
+        self._visibility_button.setEnabled(True)
+        self._visibility_button.setText(
+            "Hide Widget" if self._is_visible else "Show Widget"
+        )
+        self._run_close_button.setText("Close Widget")
+
+    def _emit_visibility_request(self):
+        if not self._is_running:
+            return
+        if self._is_visible:
+            self.hide_widget_requested.emit()
         else:
-            self._status_label.setText("Widget: Hidden")
-            self._toggle_button.setText("Show Widget")
+            self.show_widget_requested.emit()
+
+    def _emit_run_close_request(self):
+        if self._is_running:
+            self.close_widget_requested.emit()
+        else:
+            self.run_widget_requested.emit()
 
     def show_taskbar_entry(self):
         self.showMinimized()
 
     def closeEvent(self, event):
-        event.ignore()
-        self.showMinimized()
+        self.controller_close_requested.emit()
+        event.accept()

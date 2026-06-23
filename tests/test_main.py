@@ -9,44 +9,83 @@ from src.main import App
 from src.spotify_worker import PlayerState
 
 
-def _make_app():
+def _make_controller_only_app():
     config = MagicMock()
     config.refresh_token = "existing_refresh"
     config.granted_scope = (
         "user-read-currently-playing user-modify-playback-state "
         "user-read-playback-state"
     )
-    widget = MagicMock()
+    config.client_id = "existing-client"
+    config.config_dir = "config-dir"
+    config.netease_fallback = False
+    config.size_preset = "large"
+    config.window_x = 100
+    config.window_y = 200
     taskbar_host = MagicMock()
 
     with (
         patch("src.main.Config", return_value=config),
-        patch("src.main.LyricsWidget", return_value=widget),
         patch("src.main.TaskbarHostWindow", return_value=taskbar_host),
-        patch("src.main.SpotifyWorker", return_value=MagicMock()),
-        patch("src.main.LyricsWorker", return_value=MagicMock()),
     ):
         app = App()
 
+    return app, config
+
+
+def _make_app():
+    app, config = _make_controller_only_app()
+    widget = MagicMock()
+    app._widget = widget
+    app._spotify_worker = MagicMock()
+    app._lyrics_worker = MagicMock()
     return app, config, widget
 
 
-def test_start_missing_client_id_uses_onboarding_dialog():
-    app, config, _ = _make_app()
+def test_start_only_shows_controller_taskbar_entry():
+    app, config = _make_controller_only_app()
+    config.client_id = "client"
+
+    app.start()
+
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=False,
+        is_visible=False,
+    )
+    app._taskbar_host.show_taskbar_entry.assert_called_once()
+    assert app._widget is None
+    assert app._tray is None
+    assert app._spotify_worker is None
+    assert app._lyrics_worker is None
+
+
+def test_start_raises_controller_window_after_creating_taskbar_entry():
+    app, _ = _make_controller_only_app()
+
+    app.start()
+
+    app._taskbar_host.show_taskbar_entry.assert_called_once()
+    app._taskbar_host.showNormal.assert_called_once()
+    app._taskbar_host.raise_.assert_called_once()
+    app._taskbar_host.activateWindow.assert_called_once()
+
+
+def test_run_widget_missing_client_id_uses_onboarding_dialog():
+    app, config = _make_controller_only_app()
     config.client_id = None
-    config.size_preset = "large"
     app._ensure_auth = MagicMock(return_value=True)
-    qapp = MagicMock()
     dialog = MagicMock()
     dialog.exec.return_value = QDialog.DialogCode.Accepted
     dialog.client_id = "client-from-dialog"
 
     with (
-        patch("src.main.QApplication.instance", return_value=qapp),
         patch("src.main.SpotifyOnboardingDialog", return_value=dialog) as dialog_class,
+        patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock()),
         patch("src.main.TrayIcon"),
     ):
-        app.start()
+        app._run_widget()
 
     dialog_class.assert_called_once_with(main_module.REDIRECT_URI)
     assert config.client_id == "client-from-dialog"
@@ -55,57 +94,39 @@ def test_start_missing_client_id_uses_onboarding_dialog():
     app._spotify_worker.start.assert_called_once()
 
 
-def test_start_cancelled_onboarding_exits_without_starting_workers():
-    app, config, _ = _make_app()
+def test_run_widget_cancelled_onboarding_keeps_widget_stopped():
+    app, config = _make_controller_only_app()
     config.client_id = None
     dialog = MagicMock()
     dialog.exec.return_value = QDialog.DialogCode.Rejected
 
-    with (
-        patch("src.main.SpotifyOnboardingDialog", return_value=dialog),
-        patch("src.main.sys.exit", side_effect=SystemExit) as exit_app,
-        pytest.raises(SystemExit),
-    ):
-        app.start()
+    with patch("src.main.SpotifyOnboardingDialog", return_value=dialog):
+        app._run_widget()
 
-    exit_app.assert_called_once_with(1)
     config.save.assert_not_called()
-    app._spotify_worker.start.assert_not_called()
+    assert app._widget is None
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=False,
+        is_visible=False,
+    )
 
 
-def test_start_existing_client_id_skips_onboarding_dialog():
-    app, config, _ = _make_app()
+def test_run_widget_existing_client_id_skips_onboarding_dialog():
+    app, config = _make_controller_only_app()
     config.client_id = "existing-client"
-    config.size_preset = "large"
     app._ensure_auth = MagicMock(return_value=True)
-    qapp = MagicMock()
 
     with (
-        patch("src.main.QApplication.instance", return_value=qapp),
         patch("src.main.SpotifyOnboardingDialog") as dialog_class,
+        patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock()),
         patch("src.main.TrayIcon"),
     ):
-        app.start()
+        app._run_widget()
 
     dialog_class.assert_not_called()
     app._ensure_auth.assert_called_once()
-    app._spotify_worker.start.assert_called_once()
-
-
-def test_start_does_not_start_ui_timer_until_playback_sync():
-    app, config, widget = _make_app()
-    config.client_id = "existing-client"
-    config.size_preset = "large"
-    app._ensure_auth = MagicMock(return_value=True)
-    qapp = MagicMock()
-
-    with (
-        patch("src.main.QApplication.instance", return_value=qapp),
-        patch("src.main.TrayIcon"),
-    ):
-        app.start()
-
-    widget.start_ui_timer.assert_not_called()
     app._spotify_worker.start.assert_called_once()
 
 
@@ -174,6 +195,25 @@ def test_main_logs_and_shows_startup_failure():
     critical.assert_called_once()
 
 
+def test_main_single_instance_guard_activates_controller_window():
+    qapp = MagicMock(exec=lambda: 0)
+    controller = MagicMock()
+
+    with (
+        patch("src.main.configure_logging"),
+        patch("src.main.QApplication", return_value=qapp),
+        patch("src.main.build_app_icon"),
+        patch("src.main.load_app_font"),
+        patch("src.main.App", return_value=controller),
+        patch("src.main.SingleInstanceGuard") as guard_class,
+        patch("src.main.sys.exit"),
+    ):
+        guard_class.return_value.try_claim.return_value = False
+        main_module.main()
+
+    guard_class.assert_called_once_with(on_activate=controller.show_controller)
+
+
 def test_apply_token_result_keeps_refresh_token_when_response_omits_rotation():
     app, config, _ = _make_app()
 
@@ -197,10 +237,10 @@ def test_lyrics_ready_ignores_stale_track_result():
     widget.set_lyrics.assert_called_once_with([(5000, "current")])
 
 
-def test_connect_signals_wires_offline_indicator():
+def test_connect_widget_session_signals_wires_offline_indicator():
     app, _, widget = _make_app()
 
-    app._connect_signals()
+    app._connect_widget_session_signals()
 
     app._spotify_worker.network_error.connect.assert_called_once_with(
         widget.show_offline
@@ -210,10 +250,10 @@ def test_connect_signals_wires_offline_indicator():
     )
 
 
-def test_connect_signals_wires_rate_limit_state():
+def test_connect_widget_session_signals_wires_rate_limit_state():
     app, _, widget = _make_app()
 
-    app._connect_signals()
+    app._connect_widget_session_signals()
 
     app._spotify_worker.rate_limited.connect.assert_called_once_with(
         widget.show_rate_limited
@@ -261,48 +301,91 @@ def test_track_change_clears_stale_lyrics():
     widget.set_lyrics.assert_called_once_with([])
 
 
-def test_start_creates_and_shows_tray():
-    app, config, _ = _make_app()
+def test_run_widget_creates_widget_session_and_marks_running_visible():
+    app, config = _make_controller_only_app()
     config.client_id = "client"
     app._ensure_auth = MagicMock(return_value=True)
-    qapp = MagicMock()
+    widget = MagicMock()
+    spotify_worker = MagicMock()
+    lyrics_worker = MagicMock()
 
     with (
-        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.LyricsWidget", return_value=widget),
+        patch("src.main.SpotifyWorker", return_value=spotify_worker),
+        patch("src.main.LyricsWorker", return_value=lyrics_worker),
         patch("src.main.TrayIcon") as tray_class,
     ):
-        tray = tray_class.return_value
-        app.start()
+        app._run_widget()
 
+    widget.apply_size_preset.assert_called_once_with("large")
+    widget.move.assert_called_once_with(100, 200)
+    widget.show.assert_called_once()
     tray_class.assert_called_once_with(
         on_toggle=app._toggle_widget,
-        on_quit=qapp.quit,
+        on_close_widget=app._close_widget,
     )
-    tray.show.assert_called_once()
+    tray_class.return_value.show.assert_called_once()
+    spotify_worker.start.assert_called_once()
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=True,
+        is_visible=True,
+    )
 
 
-def test_raise_window_marks_taskbar_host_widget_visible():
+def test_run_widget_cancelled_auth_keeps_widget_stopped():
+    app, config = _make_controller_only_app()
+    config.client_id = "client"
+    app._ensure_auth = MagicMock(return_value=False)
+
+    app._run_widget()
+
+    assert app._widget is None
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=False,
+        is_visible=False,
+    )
+
+
+def test_show_widget_raises_running_widget():
     app, _, widget = _make_app()
 
-    app.raise_window()
+    app._show_widget()
 
     widget.showNormal.assert_called_once()
     widget.raise_.assert_called_once()
     widget.activateWindow.assert_called_once()
-    app._taskbar_host.set_widget_visible.assert_called_once_with(True)
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=True,
+        is_visible=True,
+    )
 
 
-def test_toggle_widget_hides_and_updates_taskbar_host_when_visible():
+def test_hide_widget_only_hides_running_widget_and_keeps_tray():
+    app, _, widget = _make_app()
+
+    app._hide_widget()
+
+    widget.hide.assert_called_once()
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=True,
+        is_visible=False,
+    )
+
+
+def test_toggle_widget_hides_when_visible():
     app, _, widget = _make_app()
     widget.isVisible.return_value = True
 
     app._toggle_widget()
 
     widget.hide.assert_called_once()
-    app._taskbar_host.set_widget_visible.assert_called_once_with(False)
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=True,
+        is_visible=False,
+    )
 
 
-def test_toggle_widget_raises_and_updates_taskbar_host_when_hidden():
+def test_toggle_widget_shows_when_hidden():
     app, _, widget = _make_app()
     widget.isVisible.return_value = False
 
@@ -311,143 +394,119 @@ def test_toggle_widget_raises_and_updates_taskbar_host_when_hidden():
     widget.showNormal.assert_called_once()
     widget.raise_.assert_called_once()
     widget.activateWindow.assert_called_once()
-    app._taskbar_host.set_widget_visible.assert_called_once_with(True)
-
-
-def test_widget_close_request_quits_qapplication():
-    fake_qapp = MagicMock()
-
-    with (
-        patch("src.main.QApplication.instance", return_value=fake_qapp),
-        patch("src.main.Config", return_value=MagicMock(refresh_token="refresh")),
-        patch("src.main.LyricsWidget", return_value=MagicMock()),
-        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
-        patch("src.main.SpotifyWorker", return_value=MagicMock()),
-        patch("src.main.LyricsWorker", return_value=MagicMock()),
-    ):
-        app = App()
-
-    app._widget.close_requested.connect.assert_called_once_with(fake_qapp.quit)
-
-
-def test_app_connects_taskbar_host_controls_to_toggle_and_quit():
-    fake_qapp = MagicMock()
-    taskbar_host = MagicMock()
-
-    with (
-        patch("src.main.QApplication.instance", return_value=fake_qapp),
-        patch("src.main.Config", return_value=MagicMock(refresh_token="refresh")),
-        patch("src.main.LyricsWidget", return_value=MagicMock()),
-        patch("src.main.TaskbarHostWindow", return_value=taskbar_host),
-        patch("src.main.SpotifyWorker", return_value=MagicMock()),
-        patch("src.main.LyricsWorker", return_value=MagicMock()),
-    ):
-        app = App()
-
-    taskbar_host.toggle_widget_requested.connect.assert_called_once_with(
-        app._toggle_widget
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=True,
+        is_visible=True,
     )
-    taskbar_host.quit_requested.connect.assert_called_once_with(fake_qapp.quit)
 
 
-def test_start_shows_taskbar_entry_and_marks_widget_visible():
-    app, config, _ = _make_app()
-    config.client_id = "client"
-    config.size_preset = "large"
-    app._ensure_auth = MagicMock(return_value=True)
-    qapp = MagicMock()
-
-    with (
-        patch("src.main.QApplication.instance", return_value=qapp),
-        patch("src.main.TrayIcon"),
-    ):
-        app.start()
-
-    app._taskbar_host.set_widget_visible.assert_called_with(True)
-    app._taskbar_host.show_taskbar_entry.assert_called_once()
-
-
-def test_shutdown_hides_taskbar_host():
+def test_widget_close_request_closes_widget_session():
     app, _, widget = _make_app()
-    fresh_config = MagicMock()
-    widget.pos.return_value.x.return_value = 321
-    widget.pos.return_value.y.return_value = 654
 
-    with patch("src.main.Config", return_value=fresh_config):
-        app.shutdown()
+    app._connect_widget_session_signals()
 
-    app._taskbar_host.hide.assert_called_once()
+    widget.close_requested.connect.assert_called_once_with(app._close_widget)
 
 
-def test_shutdown_reloads_config_before_saving_window_position():
-    initial_config = MagicMock()
-    initial_config.refresh_token = "old_refresh"
-    initial_config.config_dir = "config-dir"
-    fresh_config = MagicMock()
-    widget = MagicMock()
-    widget.pos.return_value.x.return_value = 321
-    widget.pos.return_value.y.return_value = 654
+def test_app_connects_taskbar_host_controls_to_widget_lifecycle():
+    app, _ = _make_controller_only_app()
+    taskbar_host = app._taskbar_host
 
-    with (
-        patch("src.main.Config", side_effect=[initial_config, fresh_config]),
-        patch("src.main.LyricsWidget", return_value=widget),
-        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
-        patch("src.main.SpotifyWorker", return_value=MagicMock()),
-        patch("src.main.LyricsWorker", return_value=MagicMock()),
-    ):
-        app = App()
-        app.shutdown()
-
-    assert fresh_config.window_x == 321
-    assert fresh_config.window_y == 654
-    fresh_config.save.assert_called_once()
-    initial_config.save.assert_not_called()
+    taskbar_host.show_widget_requested.connect.assert_called_once_with(
+        app._show_widget
+    )
+    taskbar_host.hide_widget_requested.connect.assert_called_once_with(
+        app._hide_widget
+    )
+    taskbar_host.run_widget_requested.connect.assert_called_once_with(
+        app._run_widget
+    )
+    taskbar_host.close_widget_requested.connect.assert_called_once_with(
+        app._close_widget
+    )
+    taskbar_host.controller_close_requested.connect.assert_called_once_with(
+        app._close_controller
+    )
 
 
-def test_shutdown_stops_workers_before_exit():
-    config = MagicMock()
-    config.refresh_token = "existing_refresh"
-    config.config_dir = "config-dir"
-    fresh_config = MagicMock()
+def test_close_widget_stops_workers_hides_tray_and_keeps_controller():
+    app, config = _make_controller_only_app()
     widget = MagicMock()
     spotify_worker = MagicMock()
     lyrics_worker = MagicMock()
     lyrics_worker.isRunning.return_value = True
+    tray = MagicMock()
+    fresh_config = MagicMock()
+    widget.pos.return_value.x.return_value = 321
+    widget.pos.return_value.y.return_value = 654
+    app._widget = widget
+    app._spotify_worker = spotify_worker
+    app._lyrics_worker = lyrics_worker
+    app._tray = tray
 
-    with (
-        patch("src.main.Config", side_effect=[config, fresh_config]),
-        patch("src.main.LyricsWidget", return_value=widget),
-        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
-        patch("src.main.SpotifyWorker", return_value=spotify_worker),
-        patch("src.main.LyricsWorker", return_value=lyrics_worker),
-    ):
-        app = App()
-        app.shutdown()
+    with patch("src.main.Config", return_value=fresh_config):
+        app._close_widget()
 
+    tray.hide.assert_called_once()
+    widget.hide.assert_called_once()
     spotify_worker.stop.assert_called_once()
     spotify_worker.wait.assert_called_once_with(2000)
     lyrics_worker.wait.assert_called_once_with(6000)
+    assert fresh_config.window_x == 321
+    assert fresh_config.window_y == 654
+    assert fresh_config.size_preset == config.size_preset
+    fresh_config.save.assert_called_once()
+    app._taskbar_host.hide.assert_not_called()
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=False,
+        is_visible=False,
+    )
+    assert app._widget is None
+    assert app._tray is None
 
 
-def test_shutdown_hides_tray_before_exit():
-    config = MagicMock()
-    config.refresh_token = "existing_refresh"
-    config.config_dir = "config-dir"
-    fresh_config = MagicMock()
-    tray = MagicMock()
+def test_close_widget_is_idempotent_when_stopped():
+    app, _ = _make_controller_only_app()
 
-    with (
-        patch("src.main.Config", side_effect=[config, fresh_config]),
-        patch("src.main.LyricsWidget", return_value=MagicMock()),
-        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
-        patch("src.main.SpotifyWorker", return_value=MagicMock()),
-        patch("src.main.LyricsWorker", return_value=MagicMock(isRunning=lambda: False)),
-    ):
-        app = App()
-        app._tray = tray
-        app.shutdown()
+    app._close_widget()
 
-    tray.hide.assert_called_once()
+    app._taskbar_host.set_widget_state.assert_called_with(
+        is_running=False,
+        is_visible=False,
+    )
+
+
+def test_close_controller_closes_widget_and_quits_qapplication():
+    app, _ = _make_controller_only_app()
+    app._close_widget = MagicMock()
+    fake_qapp = MagicMock()
+
+    with patch("src.main.QApplication.instance", return_value=fake_qapp):
+        app._close_controller()
+
+    app._close_widget.assert_called_once()
+    app._taskbar_host.hide.assert_called_once()
+    fake_qapp.quit.assert_called_once()
+
+
+def test_show_controller_raises_taskbar_host_window():
+    app, _ = _make_controller_only_app()
+
+    app.show_controller()
+
+    app._taskbar_host.showNormal.assert_called_once()
+    app._taskbar_host.raise_.assert_called_once()
+    app._taskbar_host.activateWindow.assert_called_once()
+
+
+def test_shutdown_closes_widget_and_hides_taskbar_host():
+    app, _ = _make_controller_only_app()
+    app._close_widget = MagicMock()
+
+    app.shutdown()
+
+    app._close_widget.assert_called_once()
+    app._taskbar_host.hide.assert_called_once()
 
 
 def test_single_instance_guard_activates_existing_instance(qtbot):
@@ -541,12 +600,13 @@ def test_ensure_auth_reauths_when_scope_is_stale():
     refresh.assert_not_called()
 
 
-def test_connect_signals_wires_widget_hide_and_size_controls():
+def test_connect_widget_session_signals_wires_widget_hide_close_and_size_controls():
     app, _, widget = _make_app()
 
-    app._connect_signals()
+    app._connect_widget_session_signals()
 
     widget.hide_requested.connect.assert_called_once_with(app._toggle_widget)
+    widget.close_requested.connect.assert_called_once_with(app._close_widget)
     widget.size_preset_requested.connect.assert_called_once_with(
         app._on_size_preset_changed
     )
@@ -565,40 +625,37 @@ def test_state_sync_resyncs_widget_timer_without_playing_icon():
 # ---- V2.03 size presets ----
 
 
-def test_app_applies_config_size_preset_on_init():
-    config = MagicMock()
-    config.refresh_token = "existing_refresh"
-    config.granted_scope = (
-        "user-read-currently-playing user-modify-playback-state "
-        "user-read-playback-state"
-    )
+def test_run_widget_applies_config_size_preset():
+    app, config = _make_controller_only_app()
+    config.client_id = "client"
     config.size_preset = "small"
+    app._ensure_auth = MagicMock(return_value=True)
     widget = MagicMock()
 
     with (
-        patch("src.main.Config", return_value=config),
         patch("src.main.LyricsWidget", return_value=widget),
-        patch("src.main.TaskbarHostWindow", return_value=MagicMock()),
         patch("src.main.SpotifyWorker", return_value=MagicMock()),
         patch("src.main.LyricsWorker", return_value=MagicMock()),
+        patch("src.main.TrayIcon"),
     ):
-        App()
+        app._run_widget()
 
     widget.apply_size_preset.assert_called_once_with("small")
 
 
-def test_start_creates_tray_without_size_menu_wiring():
-    app, config, _ = _make_app()
+def test_run_widget_creates_tray_without_size_menu_wiring():
+    app, config = _make_controller_only_app()
     config.client_id = "client"
     config.size_preset = "medium"
     app._ensure_auth = MagicMock(return_value=True)
-    qapp = MagicMock()
 
     with (
-        patch("src.main.QApplication.instance", return_value=qapp),
+        patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock()),
         patch("src.main.TrayIcon") as tray_class,
     ):
-        app.start()
+        app._run_widget()
 
     tray_class.assert_called_once()
     assert "size_preset" not in tray_class.call_args.kwargs

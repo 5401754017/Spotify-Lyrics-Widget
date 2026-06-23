@@ -12,48 +12,93 @@ def test_taskbar_host_is_regular_top_level_window(qtbot):
 
     assert (flags & Qt.WindowType.WindowType_Mask) != Qt.WindowType.Tool
     assert host.windowTitle() == "Spotify Lyrics Widget"
-    assert host.width() == 320
-    assert host.height() == 140
+    assert host.width() == 360
+    assert host.height() == 150
 
 
-def test_control_window_starts_with_hidden_widget_state(qtbot):
+def test_control_window_starts_stopped_and_hidden(qtbot):
     host = TaskbarHostWindow()
     qtbot.addWidget(host)
 
-    assert host._status_label.text() == "Widget: Hidden"
-    assert host._toggle_button.text() == "Show Widget"
-    assert host._quit_button.text() == "Quit"
+    assert host._running_label.text() == "Widget: Stopped"
+    assert host._visibility_label.text() == "Widget: Hidden"
+    assert host._visibility_button.text() == "Widget Disabled"
+    assert host._visibility_button.isEnabled() is False
+    assert host._run_close_button.text() == "Run Widget"
 
 
-def test_set_widget_visible_updates_status_and_toggle_button(qtbot):
+def test_running_visible_state_updates_labels_and_buttons(qtbot):
     host = TaskbarHostWindow()
     qtbot.addWidget(host)
 
-    host.set_widget_visible(True)
+    host.set_widget_state(is_running=True, is_visible=True)
 
-    assert host._status_label.text() == "Widget: Visible"
-    assert host._toggle_button.text() == "Hide Widget"
-
-    host.set_widget_visible(False)
-
-    assert host._status_label.text() == "Widget: Hidden"
-    assert host._toggle_button.text() == "Show Widget"
+    assert host._running_label.text() == "Widget: Running"
+    assert host._visibility_label.text() == "Widget: Visible"
+    assert host._visibility_button.text() == "Hide Widget"
+    assert host._visibility_button.isEnabled() is True
+    assert host._run_close_button.text() == "Close Widget"
 
 
-def test_toggle_button_emits_toggle_widget_requested(qtbot):
+def test_running_hidden_state_updates_labels_and_buttons(qtbot):
     host = TaskbarHostWindow()
     qtbot.addWidget(host)
 
-    with qtbot.waitSignal(host.toggle_widget_requested, timeout=1000):
-        host._toggle_button.click()
+    host.set_widget_state(is_running=True, is_visible=False)
+
+    assert host._running_label.text() == "Widget: Running"
+    assert host._visibility_label.text() == "Widget: Hidden"
+    assert host._visibility_button.text() == "Show Widget"
+    assert host._visibility_button.isEnabled() is True
+    assert host._run_close_button.text() == "Close Widget"
 
 
-def test_quit_button_emits_quit_requested(qtbot):
+def test_stopped_state_disables_visibility_button(qtbot):
     host = TaskbarHostWindow()
     qtbot.addWidget(host)
 
-    with qtbot.waitSignal(host.quit_requested, timeout=1000):
-        host._quit_button.click()
+    host.set_widget_state(is_running=False, is_visible=True)
+
+    assert host._running_label.text() == "Widget: Stopped"
+    assert host._visibility_label.text() == "Widget: Hidden"
+    assert host._visibility_button.text() == "Widget Disabled"
+    assert host._visibility_button.isEnabled() is False
+    assert host._run_close_button.text() == "Run Widget"
+
+
+def test_visibility_button_emits_hide_when_visible(qtbot):
+    host = TaskbarHostWindow()
+    qtbot.addWidget(host)
+    host.set_widget_state(is_running=True, is_visible=True)
+
+    with qtbot.waitSignal(host.hide_widget_requested, timeout=1000):
+        host._visibility_button.click()
+
+
+def test_visibility_button_emits_show_when_hidden(qtbot):
+    host = TaskbarHostWindow()
+    qtbot.addWidget(host)
+    host.set_widget_state(is_running=True, is_visible=False)
+
+    with qtbot.waitSignal(host.show_widget_requested, timeout=1000):
+        host._visibility_button.click()
+
+
+def test_run_close_button_emits_run_when_stopped(qtbot):
+    host = TaskbarHostWindow()
+    qtbot.addWidget(host)
+
+    with qtbot.waitSignal(host.run_widget_requested, timeout=1000):
+        host._run_close_button.click()
+
+
+def test_run_close_button_emits_close_when_running(qtbot):
+    host = TaskbarHostWindow()
+    qtbot.addWidget(host)
+    host.set_widget_state(is_running=True, is_visible=True)
+
+    with qtbot.waitSignal(host.close_widget_requested, timeout=1000):
+        host._run_close_button.click()
 
 
 def test_show_taskbar_entry_minimizes_host(qtbot, monkeypatch):
@@ -67,14 +112,12 @@ def test_show_taskbar_entry_minimizes_host(qtbot, monkeypatch):
     assert calls == ["minimized"]
 
 
-def test_close_event_returns_to_taskbar_without_accepting_close(qtbot, monkeypatch):
+def test_close_event_emits_controller_close_and_accepts(qtbot):
     host = TaskbarHostWindow()
     qtbot.addWidget(host)
-    calls = []
-    monkeypatch.setattr(host, "showMinimized", lambda: calls.append("minimized"))
     event = QCloseEvent()
 
-    host.closeEvent(event)
+    with qtbot.waitSignal(host.controller_close_requested, timeout=1000):
+        host.closeEvent(event)
 
-    assert calls == ["minimized"]
-    assert not event.isAccepted()
+    assert event.isAccepted()
