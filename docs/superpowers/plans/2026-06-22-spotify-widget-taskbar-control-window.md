@@ -1,5 +1,7 @@
 # Spotify Widget Taskbar 控制窗實作計畫
 
+> **狀態：已被取代。** 本 plan 描述的是舊版控制窗 `Show/Hide + Quit` 設計。最新 canonical plan 是 `docs/superpowers/plans/2026-06-23-spotify-widget-controller-lifecycle.md`。不要再依照本文件實作新的 controller lifecycle。
+
 > **給 agentic workers：** 必須使用 `superpowers:subagent-driven-development`（建議）或 `superpowers:executing-plans` 逐任務執行本計畫。所有步驟都使用 checkbox (`- [ ]`) 追蹤。
 
 **目標：** 將方案 A 的最小化空白 host 改成方案 B 的小型控制窗：taskbar entry 仍常駐，點 taskbar 顯示控制窗，控制窗提供 `Show Widget` / `Hide Widget` 與 `Quit`。
