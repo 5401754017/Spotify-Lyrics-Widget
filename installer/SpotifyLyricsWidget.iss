@@ -1,5 +1,5 @@
 #define MyAppName "Spotify Lyrics Widget"
-#define MyAppVersion "3.0.0"
+#define MyAppVersion "3.1.0"
 #define MyAppPublisher "Spotify Lyrics Widget"
 #define MyAppExeName "SpotifyLyricsWidget.exe"
 
