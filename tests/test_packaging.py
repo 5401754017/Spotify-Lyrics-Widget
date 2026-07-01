@@ -27,28 +27,18 @@ def test_app_icon_asset_exists():
     assert Path("assets/app-icon.ico").is_file()
 
 
-def test_build_script_creates_portable_release_without_deleting_outputs():
-    script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
+def test_build_script_creates_installer_input_without_portable_zip():
+    script = Path("scripts/build_app.ps1").read_text(encoding="utf-8")
 
     assert "python -m PyInstaller --noconfirm SpotifyLyricsWidget.spec" in script
-    assert 'Copy-Item -LiteralPath "README.md"' in script
-    assert "Compress-Archive" in script
+    assert 'Copy-Item -LiteralPath "README.md"' not in script
+    assert "Compress-Archive" not in script
+    assert "portable" not in script.lower()
     assert "Remove-Item" not in script
 
 
-def test_build_script_checks_existing_release_outputs_before_pyinstaller():
-    script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
-
-    pyinstaller_index = script.index(
-        "python -m PyInstaller --noconfirm SpotifyLyricsWidget.spec"
-    )
-
-    assert script.index("if (Test-Path -LiteralPath $releaseDir)") < pyinstaller_index
-    assert script.index("if (Test-Path -LiteralPath $zipPath)") < pyinstaller_index
-
-
 def test_build_script_checks_pyinstaller_exit_code_before_using_source_dir():
-    script = Path("scripts/build_portable.ps1").read_text(encoding="utf-8")
+    script = Path("scripts/build_app.ps1").read_text(encoding="utf-8")
 
     pyinstaller_index = script.index(
         "python -m PyInstaller --noconfirm SpotifyLyricsWidget.spec"

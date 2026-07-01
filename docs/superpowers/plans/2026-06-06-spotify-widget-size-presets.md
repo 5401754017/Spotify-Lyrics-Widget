@@ -1,6 +1,6 @@
 # Spotify Widget Size Presets Implementation Plan
 
-> 歷史註記：這份 plan 已完成為 V2.03 四段 preset。V2.04 的三段 Small / Medium / Large 收斂請改看 `docs/superpowers/plans/2026-06-07-spotify-widget-three-size-presets.md`。
+> 歷史註記：這份 plan 已完成為 V2.03 四段 preset，不是目前尺寸 canonical。V2.04 的三段 Small / Medium / Large 收斂請改看 `docs/superpowers/plans/2026-06-07-spotify-widget-three-size-presets.md`。
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 

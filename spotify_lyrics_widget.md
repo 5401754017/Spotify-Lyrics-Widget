@@ -1,16 +1,20 @@
 # Spotify 歌詞懸浮視窗 — 開發交接文件
 
-最後更新：2026年6月29日
+> 文件用途：這份文件是 agent/dev handoff 與版本狀態，不是產品發布頁來源。產品發布頁唯一來源請用 `docs/product-release.md`。
+>
+> 注意：下方歷史版本區塊會保留已移除功能，例如 V2 playback controls。判斷目前產品行為時，以「目前實作版本」、「目前已完成」和 V3.2 區塊為準。
 
-目前實作版本：V3.1 Windows installer + taskbar controller（branch `codex/installer`）
+最後更新：2026年6月30日
 
-下一步：merge installer branch、做外部乾淨環境 smoke test、考慮 code signing / antivirus false-positive 處理。
+目前實作版本：V3.2 installer-only release + language-aware onboarding
+
+下一步：build app folder、build installer、做外部乾淨環境 smoke test、考慮 code signing / antivirus false-positive 處理。
 
 ---
 
 ## 專案目的
 
-這是一個 Windows 自用 Spotify 歌詞懸浮視窗。目標是不用切回 Spotify App，也能在桌面最上層看到目前歌曲、同步歌詞、播放進度，並能用小型控制列操作上一首、播放/暫停、下一首。
+這是一個 Windows 自用 Spotify 歌詞懸浮視窗。目標是不用切回 Spotify App，也能在桌面最上層看到目前歌曲、同步歌詞與播放進度，並能透過 taskbar controller 或 widget hover 控制顯示、隱藏、尺寸與關閉。
 
 ---
 
@@ -24,23 +28,33 @@
 - NetEase 作為 fallback：LRCLIB 確認沒有同步歌詞時啟用；LRCLIB 暫時不可用時也會補救查一次
 - 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
 - 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
-- system tray：左鍵 toggle widget 顯示/隱藏，右鍵 menu 有 Size submenu（Small / Medium / Large）和 Quit
+- taskbar controller：可 Run / Show / Hide / Close widget，並保留穩定 Windows taskbar 入口
+- system tray：widget running 時顯示，左鍵 Open / Hide，右鍵可 Close Widget
+- widget hover controls：settings（Small / Medium / Large size menu）、hide、close
 - single-instance guard：重複開啟會聚焦既有視窗，不開第二個
 - `run.pyw` 無 console 啟動，錯誤寫入 log
-- V2 hover-only 播放控制：上一首、播放/暫停、下一首
 - 長歌名 hover marquee，未 hover 時 elide
+- V3.2 installer-only release：停止產 portable zip；`scripts/build_app.ps1` 只產 installer input folder，`scripts/build_installer.ps1` 只包 installer
+- V3.2 language-aware onboarding：installer 有雙語 custom page 可選 English / 繁體中文，並把語言寫到 `%APPDATA%/spotify-lyrics-widget/install.ini`；首次 Client ID 設定視窗會照語言顯示，也可在視窗內切換
+- V3.2 first-run trigger：缺少 `client_id` 時，第一次開啟 app 會自動進入 Client ID 設定，不需要先按 controller 的 Run Widget
+- V3.2 installer shell refresh：`ie4uinit.exe -show` 必須 `nowait`，避免 installer 卡在 Finishing installation
+
+最新完整測試紀錄：`288 passed`（2026-06-30，V3.2 installer-only + language + first-run trigger）
+
+---
+
+## 歷史里程碑（非產品頁來源）
+
+- V2 hover-only 播放控制曾經存在，但目前 UI 已移除；請勿寫進產品頁
 - V2.01 歌詞顯示最多兩個視覺行，過長時截斷為 `...`
-- V2.01 在 Spotify 已有可用 device 但 not playing 時，播放按鈕會嘗試指定 device 開始播放
+- V2.01 在 Spotify 已有可用 device 但 not playing 時，播放按鈕會嘗試指定 device 開始播放；目前產品 UI 已不提供播放按鈕
 - V2.02 在 LRCLIB timeout / 暫時不可用時，NetEase 會補救查一次；若 NetEase 也沒找到，不會把這首歌記成永久無歌詞
-- V2.03 size presets：tray menu 可切換 Current / Compact / Small / Mini 四種固定密度尺寸；所有 preset 歌詞顯示兩行；選擇會持久化到 config
-- V2.03 tray 精簡：移除 Show/Hide 和 Open log file，左鍵點 tray icon 直接 toggle widget 顯示/隱藏
-- V2.03 optimistic play/pause：點擊播放/暫停按鈕後立刻翻轉 icon 狀態，不等 API 回應
+- V2.03 size presets：tray menu 可切換 Current / Compact / Small / Mini 四種固定密度尺寸；已被 V2.04 Small / Medium / Large 取代
+- V2.03 tray 精簡與 optimistic play/pause 屬於舊 playback-control 時期；目前 UI 已移除 playback controls
 - V2.04 three size presets：收斂為 Small / Medium / Large 三種尺寸；舊 `mini / compact / current` config key 會 alias 到新值，`small` 直接代表 V2.04 新 Small
-- V3 portable onboarding：第一次啟動 widget 時協助設定 Spotify Developer App Client ID，並支援 PyInstaller one-folder portable build
+- V3 portable onboarding：第一次啟動 widget 時協助設定 Spotify Developer App Client ID，並支援 PyInstaller one-folder app build；正式發佈形式已被 V3.2 installer-only 取代
 - V3.1 taskbar controller：app 啟動後有穩定 taskbar 入口，可從 controller 啟動、顯示、隱藏、關閉 widget
 - V3.1 Windows installer：Inno Setup 安裝檔會安裝到使用者 LocalAppData，建立 Start Menu / 可選 Desktop shortcut，並刷新 Windows shell icon cache
-
-最新完整測試紀錄：`282 passed`（2026-06-24，installer branch）
 
 ---
 
@@ -61,12 +75,14 @@
 ## 外部 API
 
 - Spotify Web API
-  - `GET /v1/me/player/currently-playing`
-  - `PUT /v1/me/player/play`
-  - `PUT /v1/me/player/pause`
-  - `POST /v1/me/player/previous`
-  - `POST /v1/me/player/next`
-  - `GET /v1/me/player/devices`
+  - 目前 runtime path：
+    - `GET /v1/me/player/currently-playing`
+  - Legacy playback module / tests 仍保留，但目前產品 UI 不暴露播放控制：
+    - `PUT /v1/me/player/play`
+    - `PUT /v1/me/player/pause`
+    - `POST /v1/me/player/previous`
+    - `POST /v1/me/player/next`
+    - `GET /v1/me/player/devices`
 - LRCLIB
   - 主要同步 LRC 歌詞來源
   - timeout / non-200 / malformed JSON 視為暫時 unavailable
@@ -81,7 +97,7 @@
 
 ## Spotify scopes
 
-目前需要：
+目前 build 仍要求：
 
 ```text
 user-read-currently-playing
@@ -90,6 +106,8 @@ user-read-playback-state
 ```
 
 如果本機 config 裡的 `granted_scope` 缺少新 scope，啟動時會重新走 Spotify 授權。
+
+註：`user-modify-playback-state` / `user-read-playback-state` 是保留 legacy playback module 時留下的 scopes；目前產品 UI 不提供上一首、播放/暫停、下一首。若未來確認 playback module 不再回來，可另開 cleanup 移除 scopes、`src/playback.py` 和相關測試。
 
 ---
 
@@ -104,8 +122,8 @@ user-read-playback-state
 7. LRCLIB 暫時 unavailable 時，也會查 NetEase 補救一次。
 8. UI tick 依照 Spotify progress 選出目前歌詞行。
 9. 顯示層把歌詞限制在最多兩個視覺行。
-10. hover 時顯示播放控制與長歌名 marquee。
-11. Quit 時停止 worker/thread，移除 tray icon。
+10. hover 時顯示 settings / hide / close controls 與長歌名 marquee。
+11. Close Widget 時停止 worker/thread，移除 tray icon；controller 仍可留在 taskbar。
 
 ---
 
@@ -116,7 +134,7 @@ user-read-playback-state
 - 入口：`run.pyw`
 - 主程式：`src/main.py`
 - UI：`src/widget.py`
-- 播放控制：`src/playback.py`
+- Legacy playback module（目前產品 UI 未使用）：`src/playback.py`
 - 歌詞 worker：`src/lyrics_worker.py`
 - LRCLIB parser：`src/lrc_parser.py`
 - NetEase fallback：`src/netease.py`
@@ -126,7 +144,7 @@ user-read-playback-state
 
 ## 目前限制與 deferred
 
-- ~~尚未打包成 exe~~ → V3 已完成 PyInstaller one-folder portable build
+- ~~尚未打包成 exe~~ → V3 已完成 PyInstaller one-folder app build
 - ~~尚未做 first-run UX~~ → V3 已完成 onboarding dialog
 - ~~尚未做 Windows installer~~ → V3.1 已完成 Inno Setup installer recipe 和 build script
 - 尚未做 single `.exe`（目前是 one-folder）
@@ -259,10 +277,32 @@ Branch：`codex/installer`，worktree `.worktrees/installer`。
 
 ---
 
+## V3.2 installer-only release + language-aware onboarding
+
+V3.2 決定 installer 成為唯一正式發佈產物，不再額外產 portable zip。PyInstaller one-folder output 仍保留，定位改為 installer input。
+
+實作內容：
+
+- `scripts/build_app.ps1`：取代 `scripts/build_portable.ps1`，只執行 PyInstaller 並確認 `dist/SpotifyLyricsWidget/SpotifyLyricsWidget.exe` 存在；不複製 README、不壓 zip。
+- `scripts/build_installer.ps1`：提示改為先跑 `scripts\build_app.ps1`。
+- `installer/SpotifyLyricsWidget.iss`：版本 metadata `3.2.0`；新增雙語 custom page 選擇首次設定語言；安裝後寫入 `%APPDATA%/spotify-lyrics-widget/install.ini`。
+- `src/config.py` / `src/language.py`：新增 `language` 設定；優先使用已保存 config，其次 installer `install.ini`，最後依系統 locale 預設。
+- `src/onboarding.py`：首次 Spotify Client ID 設定支援 English / 繁體中文，並提供語言下拉切換。
+- `src/main.py`：缺少 `client_id` 時，app 啟動後自動跑 first-run setup；不再等使用者按 Run Widget。
+- `installer/SpotifyLyricsWidget.iss`：shell icon refresh 改用 `nowait`，避免 `ie4uinit.exe` 卡住時 installer 停在 Finishing installation。
+- `README.md`：入口改為 `SpotifyLyricsWidgetSetup.exe` installer 流程。
+
+驗證：
+
+- Focused suite：`45 passed`
+- Full suite：`288 passed`
+
+---
+
 ## 建議下一步
 
-1. Merge `codex/installer` 到 master 前，重跑 installer build 與 `git status`。
-2. 做外部乾淨環境 smoke test：安裝、首次設定 Spotify Client ID、OAuth、播放中歌詞顯示、解除安裝。
+1. 跑 `scripts\build_app.ps1`，再跑 `scripts\build_installer.ps1`。
+2. 做外部乾淨環境 smoke test：選 English / 繁中安裝、首次設定 Spotify Client ID、OAuth、播放中歌詞顯示、解除安裝。
 3. 處理 antivirus false-positive / code signing。
 4. LICENSE 檔案。
 5. Playlist add / default playlist（deferred）。

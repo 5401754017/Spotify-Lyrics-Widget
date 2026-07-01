@@ -1,5 +1,7 @@
 # Spotify Widget Taskbar Host 實作計畫
 
+> 狀態：歷史 plan。這是早期方案 A taskbar host 計畫；目前 controller lifecycle 以 `docs/superpowers/plans/2026-06-23-spotify-widget-controller-lifecycle.md` 和 `docs/superpowers/specs/2026-06-21-spotify-widget-taskbar-host-installer-design.md` 為準。
+
 > **給 agentic workers：** 必須使用 `superpowers:subagent-driven-development`（建議）或 `superpowers:executing-plans` 逐 task 執行本計畫。所有步驟都使用 checkbox (`- [ ]`) 追蹤。
 
 **目標：** 實作 `docs/superpowers/specs/2026-06-21-spotify-widget-taskbar-host-installer-design.md` 裡的方案 A：保留 lyrics widget 的 `Qt.Tool` 小工具行為，新增一個最小化的 taskbar host window，並設定穩定的 Windows AppUserModelID。

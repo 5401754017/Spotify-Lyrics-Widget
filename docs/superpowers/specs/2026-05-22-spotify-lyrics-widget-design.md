@@ -1,5 +1,7 @@
 # Spotify Lyrics Widget Design Spec
 
+> Status: historical umbrella design from the early V1/V2 phase. It mentions hover playback controls that are no longer part of the current product UI. Current product/release copy lives in `docs/product-release.md`; current hover controls are settings, hide, and close.
+
 Date: 2026-05-22
 
 ---

@@ -20,6 +20,7 @@ def _make_controller_only_app():
     config.config_dir = "config-dir"
     config.netease_fallback = False
     config.size_preset = "large"
+    config.language = "en"
     config.window_x = 100
     config.window_y = 200
     taskbar_host = MagicMock()
@@ -70,6 +71,32 @@ def test_start_raises_controller_window_after_creating_taskbar_entry():
     app._taskbar_host.activateWindow.assert_called_once()
 
 
+def test_start_missing_client_id_runs_first_run_setup():
+    app, config = _make_controller_only_app()
+    config.client_id = None
+    app._ensure_auth = MagicMock(return_value=True)
+    dialog = MagicMock()
+    dialog.exec.return_value = QDialog.DialogCode.Accepted
+    dialog.client_id = "client-from-first-run"
+    dialog.language = "zh_TW"
+
+    with (
+        patch("src.main.SpotifyOnboardingDialog", return_value=dialog) as dialog_class,
+        patch("src.main.LyricsWidget", return_value=MagicMock()),
+        patch("src.main.SpotifyWorker", return_value=MagicMock()),
+        patch("src.main.LyricsWorker", return_value=MagicMock()),
+        patch("src.main.TrayIcon"),
+    ):
+        app.start()
+
+    dialog_class.assert_called_once_with(main_module.REDIRECT_URI, language="en")
+    assert config.client_id == "client-from-first-run"
+    assert config.language == "zh_TW"
+    config.save.assert_called_once()
+    app._ensure_auth.assert_called_once()
+    app._spotify_worker.start.assert_called_once()
+
+
 def test_run_widget_missing_client_id_uses_onboarding_dialog():
     app, config = _make_controller_only_app()
     config.client_id = None
@@ -77,6 +104,7 @@ def test_run_widget_missing_client_id_uses_onboarding_dialog():
     dialog = MagicMock()
     dialog.exec.return_value = QDialog.DialogCode.Accepted
     dialog.client_id = "client-from-dialog"
+    dialog.language = "zh_TW"
 
     with (
         patch("src.main.SpotifyOnboardingDialog", return_value=dialog) as dialog_class,
@@ -87,8 +115,9 @@ def test_run_widget_missing_client_id_uses_onboarding_dialog():
     ):
         app._run_widget()
 
-    dialog_class.assert_called_once_with(main_module.REDIRECT_URI)
+    dialog_class.assert_called_once_with(main_module.REDIRECT_URI, language="en")
     assert config.client_id == "client-from-dialog"
+    assert config.language == "zh_TW"
     config.save.assert_called_once()
     app._ensure_auth.assert_called_once()
     app._spotify_worker.start.assert_called_once()

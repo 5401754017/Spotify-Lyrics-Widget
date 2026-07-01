@@ -1,5 +1,7 @@
 # Spotify Widget Installer Implementation Plan
 
+> 狀態：已完成的 V3.1 installer plan。V3.2 在此基礎上改為 installer-only 並加入安裝語言選擇；目前產品頁請用 `docs/product-release.md`。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add a first Inno Setup installer for the existing PyInstaller one-folder build.

@@ -120,15 +120,18 @@ class App(QObject):
         self._sync_controller_state()
         self._taskbar_host.show_taskbar_entry()
         self.show_controller()
+        if not self._config.client_id:
+            self._run_widget()
 
     def _ensure_client_configured(self) -> bool:
         if self._config.client_id:
             return True
 
-        dialog = SpotifyOnboardingDialog(REDIRECT_URI)
+        dialog = SpotifyOnboardingDialog(REDIRECT_URI, language=self._config.language)
         if dialog.exec() != QDialog.DialogCode.Accepted:
             return False
         self._config.client_id = dialog.client_id
+        self._config.language = dialog.language
         self._config.save()
         return True
 

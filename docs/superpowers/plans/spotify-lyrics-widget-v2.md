@@ -1,5 +1,7 @@
 # Spotify Lyrics Widget V2 Playback Controls + Marquee Implementation Plan
 
+> 狀態：歷史 plan。V2 playback controls 曾經實作，但目前 widget playback controls 已被 `docs/superpowers/plans/2026-06-20-widget-hover-settings-controls.md` 取代；產品頁不得再描述上一首、播放/暫停、下一首 widget 控制。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** Add hover-only Spotify-style playback controls and a hover-only long-title marquee without changing the widget's fixed 420x112 footprint or reintroducing layout jumps.

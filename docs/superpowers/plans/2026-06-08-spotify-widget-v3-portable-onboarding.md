@@ -1,5 +1,7 @@
 # Spotify Widget V3 Portable Onboarding Implementation Plan
 
+> 狀態：歷史 plan。V3 portable onboarding 已被 V3.2 installer-only release 取代；目前產品發布頁不得再把 portable zip 當正式發布格式。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 做出 V3 portable onboarding：使用者下載 portable zip、執行 `SpotifyLyricsWidget.exe`，第一次啟動時由設定視窗引導取得自己的 Spotify Client ID。

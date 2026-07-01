@@ -1,13 +1,15 @@
 # Spotify Lyrics Widget
 
+> 文件用途：這份 README 是使用者安裝與第一次設定 quickstart。產品發布頁請以 `docs/product-release.md` 為準；開發交接請看 `spotify_lyrics_widget.md`。
+
 Windows 桌面 Spotify 歌詞小工具。
 
 ## 使用方式
 
-1. 下載 portable zip。
-2. 解壓縮整個資料夾。
-3. 執行 `SpotifyLyricsWidget.exe`。
-4. 第一次啟動時，依照「Spotify 初始設定」視窗完成 Spotify 設定。
+1. 下載 `SpotifyLyricsWidgetSetup.exe`。
+2. 執行安裝程式，選擇語言並完成安裝。
+3. 從 Start Menu 或桌面捷徑開啟 `SpotifyLyricsWidget.exe`。
+4. 第一次啟動時，依照「Spotify 初始設定 / Spotify Setup」視窗完成 Spotify 設定。
 
 ## 第一次 Spotify 設定
 
@@ -35,7 +37,7 @@ Windows 桌面 Spotify 歌詞小工具。
 %APPDATA%/spotify-lyrics-widget
 ```
 
-更新新版時，可以替換 app 資料夾；原本的 token 和設定會保留。
+更新新版時，重新執行 installer；原本的 token 和設定會保留。
 
 ## 常見問題
 

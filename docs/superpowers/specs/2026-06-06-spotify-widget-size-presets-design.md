@@ -3,7 +3,7 @@
 日期：2026-06-06
 狀態：已實作為 V2.03；V2.04 將收斂為 Small / Medium / Large 三段
 
-> 歷史註記：這份文件記錄 V2.03 四段 preset 的原始設計。實作後經視覺 review，Mini 已改為兩行歌詞；下一步 V2.04 會以 `docs/superpowers/specs/2026-06-07-spotify-widget-three-size-presets-design.md` 為準，取代 Current / Compact / Small / Mini 四段命名。
+> 歷史註記：這份文件記錄 V2.03 四段 preset 的原始設計，不是目前尺寸 canonical。實作後經視覺 review，Mini 已改為兩行歌詞；目前以 `docs/superpowers/specs/2026-06-07-spotify-widget-three-size-presets-design.md` 和程式中的 Small / Medium / Large 為準。
 
 ## 目標
 

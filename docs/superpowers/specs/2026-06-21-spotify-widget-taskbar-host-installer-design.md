@@ -1,5 +1,7 @@
 # Spotify Widget Taskbar Host 與 Installer 設計
 
+> 狀態：current canonical design for taskbar controller / installer behavior。產品發布頁文案仍以 `docs/product-release.md` 為準。
+
 ## 背景
 
 目前 `SpotifyLyricsWidget.exe` 比較像 tray + floating widget。歌詞視窗使用

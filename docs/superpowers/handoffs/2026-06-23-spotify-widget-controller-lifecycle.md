@@ -1,5 +1,7 @@
 # Spotify Widget Controller Lifecycle Handoff
 
+> 狀態：歷史 handoff。這份交接描述的是 2026-06-23 當時尚未完成的 controller lifecycle 工作；目前狀態請以 `spotify_lyrics_widget.md`、`docs/superpowers/specs/2026-06-21-spotify-widget-taskbar-host-installer-design.md` 和 `docs/superpowers/plans/2026-06-23-spotify-widget-controller-lifecycle.md` 為準。
+
 ## 接手位置
 
 - Worktree：`C:\Users\crayo\personal-system\projects\spotify_widget\.worktrees\taskbar-host`

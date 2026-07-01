@@ -5,7 +5,7 @@ Set-Location $projectRoot
 
 $sourceExe = Join-Path $projectRoot "dist\SpotifyLyricsWidget\SpotifyLyricsWidget.exe"
 if (!(Test-Path -LiteralPath $sourceExe)) {
-    throw "Build output not found: $sourceExe. Run scripts\build_portable.ps1 first."
+    throw "Build output not found: $sourceExe. Run scripts\build_app.ps1 first."
 }
 
 $scriptPath = Join-Path $projectRoot "installer\SpotifyLyricsWidget.iss"

@@ -13,6 +13,7 @@ def test_default_config_created_when_missing(tmp_path):
     assert config.token_expires_at == 0
     assert config.window_x == 100
     assert config.window_y == 100
+    assert config.language in {"en", "zh_TW"}
 
 
 def test_save_and_load_config(tmp_path):
@@ -23,6 +24,7 @@ def test_save_and_load_config(tmp_path):
     config.token_expires_at = 1716400000
     config.window_x = 200
     config.window_y = 300
+    config.language = "zh_TW"
     config.save()
 
     config2 = Config(config_dir=tmp_path)
@@ -32,6 +34,7 @@ def test_save_and_load_config(tmp_path):
     assert config2.token_expires_at == 1716400000
     assert config2.window_x == 200
     assert config2.window_y == 300
+    assert config2.language == "zh_TW"
 
 
 def test_save_creates_directory(tmp_path):
@@ -60,6 +63,28 @@ def test_config_loads_utf8_bom_file(tmp_path):
     config = Config(config_dir=tmp_path)
 
     assert config.client_id == "bom-client"
+
+
+def test_config_uses_installer_language_when_config_has_no_language(tmp_path):
+    install_ini = tmp_path / "install.ini"
+    install_ini.write_text("[Install]\nLanguage=english\n", encoding="utf-8")
+
+    config = Config(config_dir=tmp_path)
+
+    assert config.language == "en"
+
+
+def test_config_saved_language_overrides_installer_language(tmp_path):
+    (tmp_path / "install.ini").write_text(
+        "[Install]\nLanguage=english\n", encoding="utf-8"
+    )
+    (tmp_path / "config.json").write_text(
+        json.dumps({"language": "zh_TW"}), encoding="utf-8"
+    )
+
+    config = Config(config_dir=tmp_path)
+
+    assert config.language == "zh_TW"
 
 
 def test_default_appdata_path():

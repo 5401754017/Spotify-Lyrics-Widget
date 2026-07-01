@@ -1,5 +1,7 @@
 # Spotify Widget V3 Portable Onboarding 設計
 
+> 狀態：歷史 spec。這份文件記錄 V3 portable zip 時期的 onboarding 設計；目前正式發佈已改為 V3.2 installer-only，產品頁請以 `docs/product-release.md` 為準。
+
 ## 目前決策
 
 V3 的目標是讓公開使用者不用懂 Python 也能試用。發佈形式先做成免安裝的 portable zip，裡面包含可執行檔。使用者下載、解壓縮，然後執行 `SpotifyLyricsWidget.exe`。

@@ -1,5 +1,7 @@
 # Widget Hover Settings Controls Implementation Plan
 
+> 狀態：current explanation for why widget playback controls were removed。產品發布頁應描述目前的 settings / hide / close hover controls，不要描述 V2 playback controls。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 >
 > 中文說明：這份計畫交給下一位 agent 或下一輪對話執行時，必須逐項打勾推進。建議用 `superpowers:subagent-driven-development`；如果要在同一個對話內做，改用 `superpowers:executing-plans`。

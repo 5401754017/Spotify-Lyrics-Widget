@@ -1,5 +1,7 @@
 # Spotify Widget Controller Lifecycle Implementation Plan
 
+> 狀態：current canonical plan for controller lifecycle。產品發布頁文案仍以 `docs/product-release.md` 為準。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use `superpowers:subagent-driven-development` (recommended) or `superpowers:executing-plans` to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 把 taskbar 控制窗改成 controller 常駐模型：controller 控制 widget Run/Close 與 Show/Hide，tray icon 綁定 widget running 狀態。
