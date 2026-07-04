@@ -74,14 +74,14 @@ def write_router() -> None:
       else if (nav.indexOf('en') === 0) target = 'en';
       else target = '{default}';
     }}
-    location.replace(target + '/');
+    location.replace(target + '/index.html');
   }})();
 </script>
 </head>
 <body style="margin:0;background:#0a0a0a;color:#b3b3b3;font-family:sans-serif;">
 <noscript style="display:block;padding:40px;text-align:center;">
-  Choose a language: <a href="zh-Hant/" style="color:#1ED760;">繁體中文</a> ·
-  <a href="en/" style="color:#1ED760;">English</a>
+  Choose a language: <a href="zh-Hant/index.html" style="color:#1ED760;">繁體中文</a> ·
+  <a href="en/index.html" style="color:#1ED760;">English</a>
 </noscript>
 </body>
 </html>
