@@ -361,6 +361,30 @@ def test_run_widget_creates_widget_session_and_marks_running_visible():
     )
 
 
+def test_run_widget_after_close_uses_position_saved_in_same_controller_session():
+    app, config = _make_controller_only_app()
+    config.client_id = "client"
+    app._ensure_auth = MagicMock(return_value=True)
+    first_widget = MagicMock()
+    second_widget = MagicMock()
+    fresh_config = MagicMock()
+    first_widget.pos.return_value.x.return_value = 321
+    first_widget.pos.return_value.y.return_value = 654
+
+    with (
+        patch("src.main.LyricsWidget", side_effect=[first_widget, second_widget]),
+        patch("src.main.SpotifyWorker", side_effect=[MagicMock(), MagicMock()]),
+        patch("src.main.LyricsWorker", side_effect=[MagicMock(), MagicMock()]),
+        patch("src.main.TrayIcon"),
+        patch("src.main.Config", return_value=fresh_config),
+    ):
+        app._run_widget()
+        app._close_widget()
+        app._run_widget()
+
+    second_widget.move.assert_called_once_with(321, 654)
+
+
 def test_run_widget_cancelled_auth_keeps_widget_stopped():
     app, config = _make_controller_only_app()
     config.client_id = "client"

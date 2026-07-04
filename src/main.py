@@ -344,9 +344,11 @@ class App(QObject):
 
     def _save_widget_position(self, widget):
         position = widget.pos()
+        self._config.window_x = position.x()
+        self._config.window_y = position.y()
         config = Config(config_dir=self._config.config_dir)
-        config.window_x = position.x()
-        config.window_y = position.y()
+        config.window_x = self._config.window_x
+        config.window_y = self._config.window_y
         config.size_preset = self._config.size_preset
         config.save()
 
