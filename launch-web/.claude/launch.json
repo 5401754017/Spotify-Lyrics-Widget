@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "launch-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "4321", "--directory", "C:/Users/crayo/personal-system/projects/spotify_widget/launch-web/site"],
+      "port": 4321
+    }
+  ]
+}

@@ -1,0 +1,261 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lyrics Widget — Spotify 桌面同步歌詞 · Windows</title>
+<meta name="description" content="永遠懸浮桌面的 Spotify 同步歌詞小工具。逐句同步、置頂懸浮、工作列控制器。Windows 11 · 免費開源 · 一鍵安裝。">
+<meta name="theme-color" content="#0a0a0a">
+<link rel="icon" href="assets/favicon.ico">
+<link rel="apple-touch-icon" href="assets/app-icon.png">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Lyrics Widget — Spotify 桌面同步歌詞">
+<meta property="og:description" content="桌面最上層就能看到目前歌曲、逐句同步歌詞與播放進度。Windows 11 · 免費開源。">
+<meta property="og:image" content="assets/app-icon.png">
+<meta name="twitter:card" content="summary_large_image">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800;900&family=IBM+Plex+Mono:wght@400;500;600&family=Noto+Sans+TC:wght@400;500;700;900&display=swap" rel="stylesheet">
+<style>
+  html { scroll-behavior: smooth; }
+  body { margin: 0; background: #0a0a0a; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+  * { box-sizing: border-box; }
+  ::selection { background: #1ED760; color: #0a0a0a; }
+  @keyframes eq { 0%,100% { transform: scaleY(.35); } 50% { transform: scaleY(1); } }
+  @keyframes floaty { 0%,100% { transform: translate(-50%, 0); } 50% { transform: translate(-50%, -9px); } }
+  @keyframes glowpulse { 0%,100% { opacity: .55; } 50% { opacity: 1; } }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes risein { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: translateY(0); } }
+
+  /* responsive tightening for the design's fixed desktop type scale */
+  @media (max-width: 720px) {
+    .hero-h1 { font-size: 44px !important; }
+    .show-h2 { font-size: 36px !important; }
+    .grid-3, .grid-2 { grid-template-columns: 1fr !important; }
+    .dl-grid { grid-template-columns: 1fr !important; }
+    .dl-side { border-left: none !important; border-top: 1px solid rgba(30,215,96,.18) !important; }
+  }
+</style>
+</head>
+<body>
+
+<section id="2a" style="position:relative; background:#0a0a0a; color:#fff; font-family:'Montserrat','Noto Sans TC',sans-serif; overflow:hidden;">
+  <!-- ambient glow -->
+  <div style="position:absolute; top:-200px; left:50%; transform:translateX(-50%); width:1000px; height:620px; background:radial-gradient(closest-side, rgba(30,215,96,.15), transparent 70%); pointer-events:none;"></div>
+
+  <!-- nav -->
+  <nav style="position:relative; max-width:1140px; margin:0 auto; padding:56px 34px 0; display:flex; align-items:center; justify-content:space-between;">
+    <div style="display:flex; align-items:center; gap:11px;">
+      <img src="assets/app-icon.png" alt="Lyrics Widget" style="width:34px; height:34px; display:block; filter:drop-shadow(0 0 1.4px rgba(255,255,255,.5));" />
+      <span style="font:700 16px/1 'Montserrat',sans-serif;">Lyrics&nbsp;Widget</span>
+    </div>
+    <a href="#dl-2a" style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:9px 17px; border-radius:999px;">下載 Installer</a>
+  </nav>
+
+  <!-- LAUNCH HERO (announcement) -->
+  <div style="position:relative; max-width:880px; margin:0 auto; padding:64px 34px 72px; text-align:center;">
+    <div style="display:inline-flex; align-items:center; gap:9px; font:600 11px/1.4 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:.22em; color:#1ED760; background:rgba(30,215,96,.08); border:1px solid rgba(30,215,96,.24); padding:9px 16px; border-radius:999px; margin-bottom:28px; white-space:nowrap;">
+      <span style="width:6px; height:6px; border-radius:50%; background:#1ED760; box-shadow:0 0 10px #1ED760;"></span>WINDOWS 11 · 正式發佈 NOW AVAILABLE
+    </div>
+    <h1 class="hero-h1" style="font:900 68px/1.0 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.035em; margin:0 0 20px;">桌面歌詞，<span style="background:linear-gradient(90deg,#1ED760,#7af0ab); -webkit-background-clip:text; background-clip:text; color:transparent;">正式登場</span>。</h1>
+    <p style="font:400 18px/1.6 'Noto Sans TC',sans-serif; color:#c9c9c9; margin:0 auto 36px; max-width:540px;">一鍵 Windows Installer、三種尺寸與穩定的工作列控制。免費、開源，裝好就能用。</p>
+    <div style="display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;">
+      <a href="#dl-2a" style="display:inline-flex; align-items:center; gap:9px; font:700 15px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:15px 28px; border-radius:999px; box-shadow:0 0 0 1px rgba(30,215,96,.5), 0 14px 40px rgba(30,215,96,.34);">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5v1.5a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-1.5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round"/></svg>
+        下載 Installer
+      </a>
+      <a href="#feat-2a" style="font:600 15px 'Montserrat','Noto Sans TC',sans-serif; color:#fff; text-decoration:none; border:1px solid rgba(255,255,255,.16); padding:14px 26px; border-radius:999px;">看看能做什麼 ↓</a>
+    </div>
+  </div>
+
+  <!-- PRODUCT SHOWCASE band (value prop + in-context mock) -->
+  <div style="background:#121212; border-top:1px solid rgba(255,255,255,.05);">
+    <div style="max-width:1140px; margin:0 auto; padding:88px 34px 104px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:58px;">
+      <div style="max-width:660px;">
+        <h2 class="show-h2" style="font:800 54px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.025em; margin:0 0 22px;">永遠懸浮桌面的<span style="color:#1ED760;">同步歌詞</span></h2>
+        <p style="font:400 19px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 auto; max-width:520px;">不用切回 Spotify，桌面最上層就能看到目前歌曲、逐句同步歌詞與播放進度；需要時，再用工作列控制器顯示、隱藏或關閉 widget。</p>
+      </div>
+      <!-- enlarged floating widget (premium hero showcase) -->
+      <div style="position:relative; display:flex; align-items:center; justify-content:center; padding:24px 0 28px;">
+        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:640px; height:380px; max-width:96%; background:radial-gradient(closest-side, rgba(30,215,96,.22), transparent 72%); filter:blur(10px); pointer-events:none;"></div>
+        <div style="position:relative; width:560px; max-width:92vw; background:rgba(20,20,20,.94); backdrop-filter:blur(10px); border:1.5px solid rgba(30,215,96,.7); border-radius:20px; padding:26px 30px 27px; box-shadow:0 36px 80px rgba(0,0,0,.62), 0 0 44px rgba(30,215,96,.26); text-align:left;">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+            <div style="font:500 12px/1 'Montserrat','Noto Sans TC',sans-serif; color:#b3b3b3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">午夜漫遊 — Demo</div>
+            <div style="display:flex; align-items:center; gap:13px; flex:none; opacity:.85;">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.1" stroke="#b3b3b3" stroke-width="1.6"/><path d="M12 2.6l1.3 2.05a7.6 7.6 0 0 1 1.9.79l2.35-.6 1.7 1.7-.6 2.35c.34.6.6 1.23.79 1.9L21.4 12l-2.05 1.3c-.19.67-.45 1.3-.79 1.9l.6 2.35-1.7 1.7-2.35-.6c-.6.34-1.23.6-1.9.79L12 21.4l-1.3-2.05a7.6 7.6 0 0 1-1.9-.79l-2.35.6-1.7-1.7.6-2.35a7.6 7.6 0 0 1-.79-1.9L2.6 12l2.05-1.3c.19-.67.45-1.3.79-1.9l-.6-2.35 1.7-1.7 2.35.6c.6-.34 1.23-.6 1.9-.79L12 2.6z" stroke="#b3b3b3" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              <svg width="13" height="13" viewBox="0 0 13 13"><rect x="2.5" y="6" width="8" height="1.5" rx=".75" fill="#b3b3b3"/></svg>
+              <svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 3l7 7M10 3l-7 7" stroke="#b3b3b3" stroke-width="1.3" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+          <div id="demoLyric" style="text-align:center; font:600 30px/1.4 'Noto Sans TC',sans-serif; color:#1ED760; margin:22px 0 22px; min-height:42px; text-shadow:0 0 22px rgba(30,215,96,.34);">霓虹在窗外緩緩亮起</div>
+          <div style="display:flex; align-items:center;">
+            <div style="flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden;"><div id="demoProgress" style="height:100%; border-radius:2px; background:#1ED760; width:24%;"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <div id="feat-2a" style="max-width:1140px; margin:0 auto; padding:84px 34px 0;">
+    <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:34px;">
+      <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">核心功能</h2>
+      <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">What it does</span>
+    </div>
+    <div class="grid-3" style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
+      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:26px 24px;">
+        <div style="width:46px; height:46px; border-radius:12px; background:rgba(30,215,96,.12); display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="#1ED760" stroke-width="2"/><circle cx="11" cy="11" r="2.6" fill="#1ED760"/></svg>
+        </div>
+        <h3 style="font:700 19px/1.2 'Noto Sans TC',sans-serif; margin:0 0 4px;">逐句同步歌詞</h3>
+        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:12px;">Synced Lyrics</div>
+        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">每秒對齊 Spotify 播放進度，歌詞唱到哪、就亮到哪，最多兩行清楚顯示。</p>
+      </div>
+      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:26px 24px;">
+        <div style="width:46px; height:46px; border-radius:12px; background:rgba(30,215,96,.12); display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polyline points="4,13 11,6 18,13" stroke="#1ED760" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="4,18 11,11 18,18" stroke="#1ED760" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        </div>
+        <h3 style="font:700 19px/1.2 'Noto Sans TC',sans-serif; margin:0 0 4px;">永遠置頂懸浮</h3>
+        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:12px;">Always On Top</div>
+        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">固定在所有視窗最上層，可自由拖曳到任何角落，不用切回 Spotify App。</p>
+      </div>
+      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:26px 24px;">
+        <div style="width:46px; height:46px; border-radius:12px; background:rgba(30,215,96,.12); display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
+          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3.4" y="4" width="15.2" height="8" rx="1.8" stroke="#1ED760" stroke-width="2"/><rect x="3" y="15" width="16" height="3.6" rx="1.4" fill="#1ED760"/><rect x="4.6" y="16.1" width="3.4" height="1.4" rx=".6" fill="#0a1f12"/></svg>
+        </div>
+        <h3 style="font:700 19px/1.2 'Noto Sans TC',sans-serif; margin:0 0 4px;">工作列控制器</h3>
+        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:12px;">Taskbar Controller</div>
+        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">常駐 Windows 工作列與系統匣，隨時可執行、顯示、隱藏或關閉 widget。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- WORKFLOW -->
+  <div style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
+    <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:42px;">
+      <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">運作流程</h2>
+      <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">How it works</span>
+    </div>
+    <div class="grid-3" style="display:grid; grid-template-columns:repeat(3,1fr); gap:22px;">
+      <div>
+        <div style="font:800 44px/1 'IBM Plex Mono',monospace; color:rgba(30,215,96,.85); margin-bottom:16px;">01</div>
+        <h3 style="font:700 18px/1.3 'Noto Sans TC',sans-serif; margin:0 0 3px;">授權 Spotify</h3>
+        <div style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a; margin-bottom:10px; letter-spacing:.08em;">CONNECT</div>
+        <p style="font:400 14px/1.6 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">OAuth PKCE 一次授權，安全取得播放權限，token 自動更新。</p>
+      </div>
+      <div>
+        <div style="font:800 44px/1 'IBM Plex Mono',monospace; color:rgba(30,215,96,.85); margin-bottom:16px;">02</div>
+        <h3 style="font:700 18px/1.3 'Noto Sans TC',sans-serif; margin:0 0 3px;">偵測目前歌曲</h3>
+        <div style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a; margin-bottom:10px; letter-spacing:.08em;">DETECT</div>
+        <p style="font:400 14px/1.6 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">每秒輪詢 currently-playing，掌握歌名、歌手與即時播放進度。</p>
+      </div>
+      <div>
+        <div style="font:800 44px/1 'IBM Plex Mono',monospace; color:rgba(30,215,96,.85); margin-bottom:16px;">03</div>
+        <h3 style="font:700 18px/1.3 'Noto Sans TC',sans-serif; margin:0 0 3px;">顯示同步歌詞</h3>
+        <div style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a; margin-bottom:10px; letter-spacing:.08em;">DISPLAY</div>
+        <p style="font:400 14px/1.6 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">比對時間軸，逐句點亮目前歌詞；中文 fallback 自動轉為繁體。</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- LYRICS SOURCE (benefit-framed) -->
+  <div style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
+    <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:28px;">
+      <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">幾乎都找得到歌詞</h2>
+      <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">Lyrics that show up</span>
+    </div>
+    <div class="grid-2" style="display:grid; grid-template-columns:1fr 1fr; gap:18px;">
+      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:28px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;"><span style="font:700 19px 'Montserrat',sans-serif;">LRCLIB</span><span style="font:600 10px 'IBM Plex Mono',monospace; color:#0a0a0a; background:#1ED760; padding:3px 8px; border-radius:5px;">主要來源</span></div>
+        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">高品質同步 LRC 歌詞主來源，時間軸對齊精準。</p>
+      </div>
+      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:28px;">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:14px;"><span style="font:700 19px 'Montserrat',sans-serif;">NetEase</span><span style="font:600 10px 'IBM Plex Mono',monospace; color:#1ED760; border:1px solid rgba(30,215,96,.4); padding:3px 8px; border-radius:5px;">備援</span></div>
+        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">主來源找不到時自動補上，中文歌詞自動轉為繁體，讓冷門歌也有字。</p>
+      </div>
+    </div>
+    <div style="font:500 12px 'IBM Plex Mono',monospace; color:#5a5a5a; margin-top:18px; letter-spacing:.04em;">Built with Python · PyQt6 · 開源 · 282 自動化測試通過</div>
+  </div>
+
+  <!-- DOWNLOAD (README-accurate) -->
+  <div id="dl-2a" style="max-width:1140px; margin:0 auto; padding:80px 34px 96px;">
+    <div style="position:relative; overflow:hidden; background:linear-gradient(135deg,#16281d 0%,#101512 60%,#0c0c0c 100%); border:1px solid rgba(30,215,96,.24); border-radius:22px;">
+      <div class="dl-grid" style="display:grid; grid-template-columns:1.15fr 1fr; align-items:stretch;">
+        <div style="position:relative; padding:54px 46px;">
+          <div style="position:absolute; top:-50px; left:-30px; width:230px; height:230px; border-radius:50%; background:radial-gradient(closest-side, rgba(30,215,96,.26), transparent 70%); filter:blur(6px);"></div>
+          <h2 style="position:relative; font:800 38px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.025em; margin:0 0 12px;">立即開始</h2>
+          <p style="position:relative; font:400 16px/1.6 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 0 28px; max-width:380px;">下載 Windows Installer，一鍵安裝、自動建立開始功能表捷徑。</p>
+          <a href="#" style="position:relative; display:inline-flex; align-items:center; gap:10px; font:700 15px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:15px 28px; border-radius:999px; box-shadow:0 12px 34px rgba(30,215,96,.3);">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5v1.5a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-1.5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round"/></svg>
+            下載 SpotifyLyricsWidgetSetup.exe
+          </a>
+          <div style="position:relative; font:500 12.5px 'Montserrat','Noto Sans TC',sans-serif; color:#6a6a6a; margin-top:18px;">Windows 11 · 設定與 token 保存在電腦 · 更新重裝不流失</div>
+        </div>
+        <div class="dl-side" style="border-left:1px solid rgba(30,215,96,.18); padding:46px 40px; display:flex; flex-direction:column; gap:22px; background:rgba(0,0,0,.2);">
+          <div style="display:flex; align-items:center; gap:11px; font:700 13px 'Montserrat','Noto Sans TC',sans-serif; color:#1ED760; letter-spacing:.01em;"><span style="width:20px; height:1.5px; background:#1ED760; border-radius:1px;"></span>第一次設定 · 3 步</div>
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <span style="font:700 14px 'IBM Plex Mono',monospace; color:#1ED760; flex:none; width:20px;">01</span>
+            <div><div style="font:700 14px/1.3 'Noto Sans TC',sans-serif; margin-bottom:3px;">安裝並開啟</div><p style="font:400 13px/1.55 'Noto Sans TC',sans-serif; color:#9a9a9a; margin:0;">從 Start Menu 開啟 SpotifyLyricsWidget。</p></div>
+          </div>
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <span style="font:700 14px 'IBM Plex Mono',monospace; color:#1ED760; flex:none; width:20px;">02</span>
+            <div><div style="font:700 14px/1.3 'Noto Sans TC',sans-serif; margin-bottom:3px;">貼上 Client ID</div><p style="font:400 13px/1.55 'Noto Sans TC',sans-serif; color:#9a9a9a; margin:0;">依「Spotify 初始設定」視窗，建立自己的 App 並貼上 Client ID。</p></div>
+          </div>
+          <div style="display:flex; gap:14px; align-items:flex-start;">
+            <span style="font:700 14px 'IBM Plex Mono',monospace; color:#1ED760; flex:none; width:20px;">03</span>
+            <div><div style="font:700 14px/1.3 'Noto Sans TC',sans-serif; margin-bottom:3px;">完成授權</div><p style="font:400 13px/1.55 'Noto Sans TC',sans-serif; color:#9a9a9a; margin:0;">瀏覽器按 Agree 同意，歌詞立刻開始同步。</p></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- footer -->
+  <footer style="border-top:1px solid rgba(255,255,255,.06);">
+    <div style="max-width:1140px; margin:0 auto; padding:30px 34px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+      <div style="display:flex; align-items:center; gap:10px;">
+        <img src="assets/app-icon.png" alt="Lyrics Widget" style="width:24px; height:24px; display:block; filter:drop-shadow(0 0 1.2px rgba(255,255,255,.45));" />
+        <span style="font:700 14px 'Montserrat',sans-serif;">Lyrics Widget</span>
+      </div>
+      <span style="font:400 12px 'Montserrat','Noto Sans TC',sans-serif; color:#5a5a5a;">非官方專案，與 Spotify AB 無任何關聯 · © 2026</span>
+    </div>
+  </footer>
+</section>
+
+<script>
+  // Live demo animation for the floating widget mock — ported from the
+  // original Claude Design DCLogic component (props: animateDemo, demoSpeed).
+  (function () {
+    var lyricEl = document.getElementById('demoLyric');
+    var progressEl = document.getElementById('demoProgress');
+    if (!lyricEl || !progressEl) return;
+
+    var lines = ['霓虹在窗外緩緩亮起', '街角的風還記得那首歌', '把整座城市調成靜音', '只剩旋律陪我走過深夜'];
+    var speed = 1;                 // demoSpeed default
+    var animate = true;            // animateDemo default
+    // respect users who prefer reduced motion
+    if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) animate = false;
+
+    var progress = 24;
+    var lyricIdx = 1;
+    lyricEl.textContent = lines[lyricIdx];
+    progressEl.style.width = progress.toFixed(1) + '%';
+    if (!animate) return;
+
+    setInterval(function () {
+      progress += 0.45 * speed;
+      if (progress >= 100) progress = 0;
+      var seg = Math.min(lines.length - 1, Math.floor(progress / (100 / lines.length)));
+      progressEl.style.width = progress.toFixed(1) + '%';
+      if (seg !== lyricIdx) {
+        lyricIdx = seg;
+        lyricEl.textContent = lines[lyricIdx];
+      }
+    }, 70);
+  })();
+</script>
+</body>
+</html>
