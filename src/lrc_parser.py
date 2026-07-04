@@ -38,3 +38,24 @@ def find_current_line(lines: list[tuple[int, str]], progress_ms: int) -> int:
 
     timestamps = [line[0] for line in lines]
     return bisect_right(timestamps, progress_ms) - 1
+
+
+def should_blank_incomplete_tail(
+    progress_ms: int,
+    lines: list[tuple[int, str]],
+    duration_ms: int,
+    grace_ms: int = 6000,
+    min_uncovered_ratio: float = 0.3,
+) -> bool:
+    """True when playback has run well past an incomplete lyric source's last line.
+
+    A short source (e.g. a 4-line loop returned for a full song) otherwise freezes
+    on its last line for the rest of the track. Blank only once playback is past that
+    line by grace_ms AND the lyrics leave a large tail of the song uncovered, so a
+    genuine last-line-near-the-end source keeps displaying normally."""
+    if not lines or duration_ms <= 0:
+        return False
+    last_ts = lines[-1][0]
+    if progress_ms <= last_ts + grace_ms:
+        return False
+    return (duration_ms - last_ts) >= duration_ms * min_uncovered_ratio

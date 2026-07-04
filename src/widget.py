@@ -30,7 +30,7 @@ from PyQt6.QtWidgets import (
 
 from src.fonts import app_font_family
 from src.lyric_clamp import clamp_lyric_text
-from src.lrc_parser import find_current_line
+from src.lrc_parser import find_current_line, should_blank_incomplete_tail
 from src.marquee import MarqueeLabel
 
 
@@ -259,6 +259,8 @@ class LyricsWidget(QWidget):
     close_requested = pyqtSignal()
     hide_requested = pyqtSignal()
     size_preset_requested = pyqtSignal(str)
+
+    _TAIL_BLANKED = -2  # _current_line_idx sentinel: past an incomplete source's end
 
     def __init__(self):
         super().__init__()
@@ -574,6 +576,13 @@ class LyricsWidget(QWidget):
             self._update_lyric_display(estimated_ms)
 
     def _update_lyric_display(self, progress_ms: int):
+        if should_blank_incomplete_tail(progress_ms, self._lyrics, self._duration_ms):
+            if self._current_line_idx == self._TAIL_BLANKED:
+                return
+            self._current_line_idx = self._TAIL_BLANKED
+            self._lyric_label.setText("")
+            return
+
         index = find_current_line(self._lyrics, progress_ms)
         if index == self._current_line_idx:
             return

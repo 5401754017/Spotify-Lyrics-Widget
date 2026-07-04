@@ -314,6 +314,24 @@ def test_set_lyrics_updates_current_line_when_paused(qtbot):
     assert widget._lyric_label.text() == "Line 1"
 
 
+def test_lyric_blanks_after_incomplete_source_runs_out(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(118000)
+    widget.set_lyrics([(2000, "Line 1"), (8000, "Line 2")])  # only covers 8s of 118s
+    widget.resync_local_timer(20000, False, time.monotonic())
+    assert widget._lyric_label.text() == ""
+
+
+def test_lyric_keeps_last_line_for_complete_source(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(118000)
+    widget.set_lyrics([(2000, "Line 1"), (114000, "Last line")])
+    widget.resync_local_timer(117000, False, time.monotonic())
+    assert widget._lyric_label.text() == "Last line"
+
+
 def test_show_not_playing_stops_ui_timer(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)

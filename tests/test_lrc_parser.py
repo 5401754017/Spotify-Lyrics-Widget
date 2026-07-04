@@ -1,4 +1,8 @@
-from src.lrc_parser import find_current_line, parse_lrc
+from src.lrc_parser import (
+    find_current_line,
+    parse_lrc,
+    should_blank_incomplete_tail,
+)
 
 
 class TestParseLrc:
@@ -78,6 +82,27 @@ class TestFindCurrentLine:
     def test_exact_match_last(self):
         lines = [(5000, "First"), (10000, "Second")]
         assert find_current_line(lines, 10000) == 1
+
+
+class TestShouldBlankIncompleteTail:
+    def test_blanks_when_far_past_last_line_and_source_incomplete(self):
+        lines = [(2000, "a"), (8000, "b")]  # last line at 8s of a 118s song
+        assert should_blank_incomplete_tail(20000, lines, duration_ms=118000) is True
+
+    def test_keeps_showing_within_grace_after_last_line(self):
+        lines = [(2000, "a"), (8000, "b")]
+        assert should_blank_incomplete_tail(10000, lines, duration_ms=118000) is False
+
+    def test_does_not_blank_when_last_line_near_song_end(self):
+        lines = [(2000, "a"), (114000, "b")]  # loop covers nearly the whole song
+        assert should_blank_incomplete_tail(117000, lines, duration_ms=118000) is False
+
+    def test_no_blank_without_known_duration(self):
+        lines = [(2000, "a"), (8000, "b")]
+        assert should_blank_incomplete_tail(50000, lines, duration_ms=0) is False
+
+    def test_no_blank_when_no_lyrics(self):
+        assert should_blank_incomplete_tail(50000, [], duration_ms=118000) is False
 
 
 def test_single_timestamp_unchanged():
