@@ -57,8 +57,11 @@
   <!-- ambient glow -->
   <div style="position:absolute; top:-200px; left:50%; transform:translateX(-50%); width:1000px; height:620px; background:radial-gradient(closest-side, rgba(30,215,96,.15), transparent 70%); pointer-events:none;"></div>
 
+  <!-- first screen: nav + hero fill the viewport, hero centered -->
+  <div style="position:relative; min-height:100vh; display:flex; flex-direction:column;">
+
   <!-- nav -->
-  <nav style="position:relative; max-width:1140px; margin:0 auto; padding:56px 34px 0; display:flex; align-items:center; justify-content:space-between;">
+  <nav style="position:relative; max-width:1140px; width:100%; margin:0 auto; padding:40px 34px 0; display:flex; align-items:center; justify-content:space-between;">
     <div style="display:flex; align-items:center; gap:11px;">
       <img src="../assets/app-icon.png" alt="Lyrics Widget" style="width:34px; height:34px; display:block; filter:drop-shadow(0 0 1.4px rgba(255,255,255,.5));" />
       <span style="font:700 16px/1 'Montserrat',sans-serif;">Lyrics&nbsp;Widget</span>
@@ -72,13 +75,13 @@
     </div>
   </nav>
 
-  <!-- LAUNCH HERO (announcement) -->
-  <div style="position:relative; max-width:880px; margin:0 auto; padding:64px 34px 72px; text-align:center;">
+  <!-- LAUNCH HERO (announcement) — vertically centered in the first screen -->
+  <div style="position:relative; max-width:880px; margin:0 auto; padding:34px 34px 60px; text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center;">
     <div style="display:inline-flex; align-items:center; gap:9px; font:600 11px/1.4 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:.22em; color:#1ED760; background:rgba(30,215,96,.08); border:1px solid rgba(30,215,96,.24); padding:9px 16px; border-radius:999px; margin-bottom:28px; white-space:nowrap;">
       <span style="width:6px; height:6px; border-radius:50%; background:#1ED760; box-shadow:0 0 10px #1ED760;"></span>WINDOWS 11 · NOW AVAILABLE
     </div>
     <h1 class="hero-h1" style="font:900 68px/1.0 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.035em; margin:0 0 20px;">Desktop lyrics, <span style="background:linear-gradient(90deg,#1ED760,#7af0ab); -webkit-background-clip:text; background-clip:text; color:transparent;">officially here</span>.</h1>
-    <p style="font:400 18px/1.6 'Noto Sans TC',sans-serif; color:#c9c9c9; margin:0 auto 36px; max-width:540px;">A one-click Windows installer, three widget sizes, and a rock-solid taskbar controller. Free, open source, and ready the moment it's installed.</p>
+    <p style="font:400 18px/1.6 'Noto Sans TC',sans-serif; color:#c9c9c9; margin:0 auto 36px; max-width:540px;">A one-click Windows installer, three widget sizes, and a rock-solid taskbar controller.</p>
     <div style="display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;">
       <a href="#dl-2a" style="display:inline-flex; align-items:center; gap:9px; font:700 15px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:15px 28px; border-radius:999px; box-shadow:0 0 0 1px rgba(30,215,96,.5), 0 14px 40px rgba(30,215,96,.34);">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5v1.5a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-1.5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round"/></svg>
@@ -88,12 +91,14 @@
     </div>
   </div>
 
+  </div><!-- /first screen -->
+
   <!-- PRODUCT SHOWCASE band (value prop + in-context mock) -->
   <div style="background:#121212; border-top:1px solid rgba(255,255,255,.05);">
     <div style="max-width:1140px; margin:0 auto; padding:88px 34px 104px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:58px;">
       <div style="max-width:660px;">
         <h2 class="show-h2" style="font:800 54px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.025em; margin:0 0 22px;">Always on your desktop, <span style="color:#1ED760;">synced lyrics</span></h2>
-        <p style="font:400 19px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 auto; max-width:520px;">No need to switch back to Spotify — the current track, line-by-line synced lyrics, and playback progress stay right on top of your desktop. When you need to, use the taskbar controller to show, hide, or close the widget.</p>
+        <p style="font:400 19px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 auto; max-width:520px;">The current track, line-by-line synced lyrics, and playback progress — right on top of your desktop.</p>
       </div>
       <!-- enlarged floating widget (premium hero showcase) -->
       <div style="position:relative; display:flex; align-items:center; justify-content:center; padding:24px 0 28px;">

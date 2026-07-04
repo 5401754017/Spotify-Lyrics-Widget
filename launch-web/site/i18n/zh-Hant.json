@@ -11,13 +11,13 @@
   "h1_pre": "桌面歌詞，",
   "h1_hl": "正式登場",
   "h1_post": "。",
-  "hero_sub": "一鍵 Windows Installer、三種尺寸與穩定的工作列控制。免費、開源，裝好就能用。",
+  "hero_sub": "一鍵 Windows Installer、三種尺寸與穩定的工作列控制。",
   "cta_download": "下載 Installer",
   "cta_secondary": "看看能做什麼 ↓",
 
   "show_h2_pre": "永遠懸浮桌面的",
   "show_h2_hl": "同步歌詞",
-  "show_p": "不用切回 Spotify，桌面最上層就能看到目前歌曲、逐句同步歌詞與播放進度；需要時，再用工作列控制器顯示、隱藏或關閉 widget。",
+  "show_p": "桌面最上層就能看到目前歌曲、逐句同步歌詞與播放進度。",
   "demo_track": "午夜漫遊 — Demo",
   "demo_lines": ["霓虹在窗外緩緩亮起", "街角的風還記得那首歌", "把整座城市調成靜音", "只剩旋律陪我走過深夜"],
 
