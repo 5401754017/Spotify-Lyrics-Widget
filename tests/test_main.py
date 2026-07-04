@@ -1,5 +1,5 @@
 import logging
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, call, patch
 
 import pytest
 from PyQt6.QtWidgets import QDialog
@@ -510,9 +510,11 @@ def test_close_widget_stops_workers_hides_tray_and_keeps_controller():
     assert fresh_config.size_preset == config.size_preset
     fresh_config.save.assert_called_once()
     app._taskbar_host.hide.assert_not_called()
-    app._taskbar_host.set_widget_state.assert_called_with(
-        is_running=False,
-        is_visible=False,
+    app._taskbar_host.set_widget_state.assert_has_calls(
+        [
+            call(is_running=True, is_visible=False, is_closing=True),
+            call(is_running=False, is_visible=False),
+        ]
     )
     assert app._widget is None
     assert app._tray is None

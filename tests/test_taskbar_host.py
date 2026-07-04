@@ -66,6 +66,20 @@ def test_stopped_state_disables_visibility_button(qtbot):
     assert host._run_close_button.text() == "Run Widget"
 
 
+def test_closing_state_disables_widget_controls(qtbot):
+    host = TaskbarHostWindow()
+    qtbot.addWidget(host)
+
+    host.set_widget_state(is_running=True, is_visible=False, is_closing=True)
+
+    assert host._running_label.text() == "Widget: Closing..."
+    assert host._visibility_label.text() == "Widget: Hidden"
+    assert host._visibility_button.text() == "Widget Disabled"
+    assert host._visibility_button.isEnabled() is False
+    assert host._run_close_button.text() == "Closing..."
+    assert host._run_close_button.isEnabled() is False
+
+
 def test_visibility_button_emits_hide_when_visible(qtbot):
     host = TaskbarHostWindow()
     qtbot.addWidget(host)

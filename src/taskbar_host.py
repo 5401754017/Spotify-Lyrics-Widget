@@ -15,6 +15,7 @@ class TaskbarHostWindow(QWidget):
         super().__init__()
         self._is_running = False
         self._is_visible = False
+        self._is_closing = False
 
         self.setWindowTitle("Spotify Lyrics Widget")
         self.setWindowIcon(build_app_icon())
@@ -41,9 +42,26 @@ class TaskbarHostWindow(QWidget):
         self._run_close_button.clicked.connect(self._emit_run_close_request)
         self.set_widget_state(is_running=False, is_visible=False)
 
-    def set_widget_state(self, is_running: bool, is_visible: bool):
+    def set_widget_state(
+        self,
+        is_running: bool,
+        is_visible: bool,
+        is_closing: bool = False,
+    ):
         self._is_running = is_running
+        self._is_closing = bool(is_running and is_closing)
         self._is_visible = is_visible if is_running else False
+        if self._is_closing:
+            self._is_visible = False
+            self._running_label.setText("Widget: Closing...")
+            self._visibility_label.setText("Widget: Hidden")
+            self._visibility_button.setText("Widget Disabled")
+            self._visibility_button.setEnabled(False)
+            self._run_close_button.setText("Closing...")
+            self._run_close_button.setEnabled(False)
+            return
+
+        self._run_close_button.setEnabled(True)
         self._running_label.setText(
             "Widget: Running" if self._is_running else "Widget: Stopped"
         )
@@ -64,7 +82,7 @@ class TaskbarHostWindow(QWidget):
         self._run_close_button.setText("Close Widget")
 
     def _emit_visibility_request(self):
-        if not self._is_running:
+        if not self._is_running or self._is_closing:
             return
         if self._is_visible:
             self.hide_widget_requested.emit()
@@ -72,6 +90,8 @@ class TaskbarHostWindow(QWidget):
             self.show_widget_requested.emit()
 
     def _emit_run_close_request(self):
+        if self._is_closing:
+            return
         if self._is_running:
             self.close_widget_requested.emit()
         else:

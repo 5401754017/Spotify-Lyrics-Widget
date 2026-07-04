@@ -2,7 +2,7 @@ import logging
 import sys
 import time
 
-from PyQt6.QtCore import QObject, pyqtSlot
+from PyQt6.QtCore import QEventLoop, QObject, pyqtSlot
 from PyQt6.QtNetwork import QLocalServer, QLocalSocket
 from PyQt6.QtWidgets import QApplication, QDialog, QMessageBox
 
@@ -364,6 +364,22 @@ class App(QObject):
         self._tray = None
         self._current_track_id = None
         self._is_playing = False
+
+        if (
+            widget is not None
+            or spotify_worker is not None
+            or lyrics_worker is not None
+            or tray is not None
+        ):
+            self._taskbar_host.set_widget_state(
+                is_running=True,
+                is_visible=False,
+                is_closing=True,
+            )
+            if QApplication.instance() is not None:
+                QApplication.processEvents(
+                    QEventLoop.ProcessEventsFlag.ExcludeUserInputEvents
+                )
 
         if tray is not None:
             tray.hide()
