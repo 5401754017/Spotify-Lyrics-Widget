@@ -127,6 +127,35 @@ def rank_search_results(
     return candidates[0][1]
 
 
+def _clean_track_for_search(track_name: str) -> str:
+    """Drop a trailing decorative suffix Spotify appends (' - Original Mix', ' - Remix')."""
+    cleaned = re.sub(r"\s*-\s*[^-]+$", "", track_name).strip()
+    return cleaned or track_name
+
+
+def _lrclib_search_ranked(
+    params: dict, duration_s: int, info: TrackInfo
+) -> tuple[list[tuple[int, str]] | None, int]:
+    """Run one /search and return (parsed synced lyrics or None, result count)."""
+    try:
+        response = httpx.get(f"{LRCLIB_BASE}/search", params=params, timeout=10.0)
+    except httpx.TimeoutException as error:
+        raise LrclibUnavailableError(f"lrclib search timeout: {error}") from error
+
+    data = _lrclib_json_or_unavailable(response)
+    if not (isinstance(data, list) and data):
+        return None, 0
+    best = rank_search_results(
+        data,
+        target_duration_s=duration_s,
+        target_track=info.track_name,
+        target_artist=info.artist_name,
+    )
+    if best and best.get("syncedLyrics"):
+        return parse_lrc(best["syncedLyrics"]), len(data)
+    return None, len(data)
+
+
 def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
     """Fetch parsed synced lyrics, or None after a confirmed no-lyrics result."""
     duration_s = info.duration_ms // 1000
@@ -157,39 +186,34 @@ def fetch_lyrics_from_lrclib(info: TrackInfo) -> list[tuple[int, str]] | None:
     else:
         logging.info("LRCLIB /get %d for %s, trying /search", get_status, info.track_name)
 
-    try:
-        response = httpx.get(
-            f"{LRCLIB_BASE}/search",
-            params={
-                "track_name": info.track_name,
-                "artist_name": info.artist_name,
-            },
-            timeout=10.0,
-        )
-    except httpx.TimeoutException as error:
-        raise LrclibUnavailableError(f"lrclib search timeout: {error}") from error
-
-    data = _lrclib_json_or_unavailable(response)
-    if isinstance(data, list) and data:
-        best = rank_search_results(
-            data,
-            target_duration_s=duration_s,
-            target_track=info.track_name,
-            target_artist=info.artist_name,
-        )
-        if best and best.get("syncedLyrics"):
-            parsed = parse_lrc(best["syncedLyrics"])
-            logging.info(
-                "LRCLIB /search hit for %s (%d lines, ranked from %d results)",
-                info.track_name, len(parsed), len(data),
-            )
-            return parsed
+    parsed, precise_count = _lrclib_search_ranked(
+        {"track_name": info.track_name, "artist_name": info.artist_name},
+        duration_s, info,
+    )
+    if parsed:
         logging.info(
-            "LRCLIB /search no acceptable match for %s (%d results)",
-            info.track_name, len(data),
+            "LRCLIB /search hit for %s (%d lines, ranked from %d results)",
+            info.track_name, len(parsed), precise_count,
         )
-        return None
-    logging.info("LRCLIB /search no acceptable match for %s (0 results)", info.track_name)
+        return parsed
+
+    # Relaxed retry: LRCLIB /search with a multi-artist filter often returns 0;
+    # drop the artist and strip decorative suffixes to find sibling/remix entries.
+    relaxed_track = _clean_track_for_search(info.track_name)
+    parsed, relaxed_count = _lrclib_search_ranked(
+        {"track_name": relaxed_track}, duration_s, info,
+    )
+    if parsed:
+        logging.info(
+            "LRCLIB relaxed /search hit for %s (query=%r, %d lines from %d results)",
+            info.track_name, relaxed_track, len(parsed), relaxed_count,
+        )
+        return parsed
+
+    logging.info(
+        "LRCLIB /search no acceptable match for %s (precise %d, relaxed %d results)",
+        info.track_name, precise_count, relaxed_count,
+    )
     return None
 
 

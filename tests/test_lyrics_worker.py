@@ -63,7 +63,8 @@ class TestFetchLyrics:
     def test_both_fail_returns_none(self, mock_get):
         mock_get.side_effect = [
             MagicMock(status_code=404, json=lambda: {}),
-            MagicMock(status_code=200, json=lambda: []),
+            MagicMock(status_code=200, json=lambda: []),  # precise /search
+            MagicMock(status_code=200, json=lambda: []),  # relaxed /search
         ]
         info = TrackInfo(
             track_id="t1",
@@ -74,6 +75,48 @@ class TestFetchLyrics:
         )
         result = fetch_lyrics_from_lrclib(info)
         assert result is None
+
+    @patch("src.lyrics_worker.httpx.get")
+    def test_relaxed_track_only_search_finds_match_precise_missed(self, mock_get):
+        mock_get.side_effect = [
+            MagicMock(status_code=404, json=lambda: {}),  # /get
+            MagicMock(status_code=200, json=lambda: []),  # precise track+artist -> 0
+            MagicMock(status_code=200, json=lambda: [     # relaxed track-only -> hit
+                {
+                    "trackName": "Losing Interest",
+                    "artistName": "itssvd feat. Shiloh Dynasty",
+                    "duration": 121,
+                    "syncedLyrics": "[00:05.00] found it",
+                },
+            ]),
+        ]
+        info = TrackInfo(
+            track_id="t1",
+            track_name="Losing Interest - Original Mix",
+            artist_name="Loyalenemyx, Shiloh Dynasty",
+            album_name="Album",
+            duration_ms=117000,
+        )
+        result = fetch_lyrics_from_lrclib(info)
+        assert result == [(5000, "found it")]
+
+    @patch("src.lyrics_worker.httpx.get")
+    def test_relaxed_search_drops_artist_and_strips_suffix(self, mock_get):
+        mock_get.side_effect = [
+            MagicMock(status_code=404, json=lambda: {}),
+            MagicMock(status_code=200, json=lambda: []),
+            MagicMock(status_code=200, json=lambda: []),
+        ]
+        info = TrackInfo(
+            track_id="t1",
+            track_name="Losing Interest - Original Mix",
+            artist_name="Loyalenemyx, Shiloh Dynasty",
+            album_name="Album",
+            duration_ms=117000,
+        )
+        fetch_lyrics_from_lrclib(info)
+        relaxed_params = mock_get.call_args_list[2].kwargs["params"]
+        assert relaxed_params == {"track_name": "Losing Interest"}
 
     @patch("src.lyrics_worker.httpx.get")
     def test_network_error_raises(self, mock_get):
@@ -525,6 +568,7 @@ class TestLrclibFetchLogs:
         mock_get.side_effect = [
             MagicMock(status_code=200, json=lambda: {"syncedLyrics": None, "plainLyrics": "x"}),
             MagicMock(status_code=200, json=lambda: []),
+            MagicMock(status_code=200, json=lambda: []),
         ]
         info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
         caplog.set_level(logging.INFO)
@@ -532,7 +576,7 @@ class TestLrclibFetchLogs:
         assert result is None
         messages = [r.message for r in caplog.records]
         assert any("/get 200 no syncedLyrics" in m and "trying /search" in m for m in messages)
-        assert any("/search no acceptable match" in m and "0 results" in m for m in messages)
+        assert any("/search no acceptable match" in m and "relaxed 0 results" in m for m in messages)
 
     @patch("src.lyrics_worker.httpx.get")
     def test_search_ranking_rejects_all_logs_concrete_reason(self, mock_get, caplog):
@@ -542,10 +586,11 @@ class TestLrclibFetchLogs:
                 {"trackName": "Other", "artistName": "Other",
                  "duration": 999, "syncedLyrics": "[00:01.00]x"},
             ]),
+            MagicMock(status_code=200, json=lambda: []),
         ]
         info = TrackInfo("t1", "Song", "Artist", "Album", 180000)
         caplog.set_level(logging.INFO)
         result = fetch_lyrics_from_lrclib(info)
         assert result is None
         messages = [r.message for r in caplog.records]
-        assert any("/search no acceptable match" in m and "1 results" in m for m in messages)
+        assert any("/search no acceptable match" in m and "precise 1" in m for m in messages)
