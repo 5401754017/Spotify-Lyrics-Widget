@@ -252,6 +252,23 @@ class TestRankSearchResults:
         )
         assert best is not None
 
+    def test_rejects_wrong_title_even_if_artist_and_duration_match(self):
+        results = [
+            {
+                "syncedLyrics": "[00:01.00] A",
+                "trackName": "So Innocent",
+                "artistName": "Shiloh Dynasty",
+                "duration": 180,
+            }
+        ]
+        best = rank_search_results(
+            results,
+            target_duration_s=180,
+            target_track="Novocaine",
+            target_artist="Shiloh Dynasty",
+        )
+        assert best is None
+
     def test_prefers_exact_name_over_partial(self):
         results = [
             {

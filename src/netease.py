@@ -108,10 +108,10 @@ def rank_netease_songs(songs, target_track, target_artist, target_duration_s) ->
         artists = song.get("artists") or []
         sa = _normalize(", ".join(a.get("name", "") for a in artists))
         name_match = 0 if st == nt else (5 if nt and (nt in st or st in nt) else 10)
+        if name_match >= 10:  # wrong title = wrong song even if artist matches
+            continue
         artist_match = 0 if sa == na else (5 if na and (na in sa or sa in na) else 10)
         text_score = name_match + artist_match
-        if text_score >= 20:  # both unmatched → wrong song; wrong lyrics worse than none
-            continue
         dur_diff = abs(song.get("duration", 0) // 1000 - target_duration_s)
         if dur_diff <= DURATION_TOLERANCE_S:
             dur_penalty = 0.0

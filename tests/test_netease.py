@@ -36,6 +36,11 @@ class TestRanking:
         songs = [_song(1, "Totally Different", "Nobody", 180000)]
         assert rank_netease_songs(songs, "Song", "Artist", target_duration_s=180) == []
 
+    def test_rejects_wrong_title_even_if_artist_matches(self):
+        # Regression: "So Innocent" (same artist) was used as lyrics for "Novocaine"
+        songs = [_song(1, "So Innocent", "Shiloh Dynasty", 150000)]
+        assert rank_netease_songs(songs, "Novocaine", "Shiloh Dynasty", target_duration_s=137) == []
+
     def test_returns_at_most_three(self):
         songs = [_song(i, "Song", "Artist", 180000) for i in range(6)]
         assert len(rank_netease_songs(songs, "Song", "Artist", 180)) <= 3

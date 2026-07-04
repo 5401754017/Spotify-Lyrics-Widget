@@ -106,6 +106,8 @@ def rank_search_results(
                 else 10
             )
         )
+        if name_match >= 10:  # wrong title = wrong song even if artist matches
+            continue
         artist_match = (
             0
             if result_artist == normalized_artist
