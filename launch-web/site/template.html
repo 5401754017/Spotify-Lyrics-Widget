@@ -41,6 +41,17 @@
   .langsw a { font:600 12px 'Montserrat','Noto Sans TC',sans-serif; color:#b3b3b3; text-decoration:none; padding:5px 11px; border-radius:999px; line-height:1; }
   .langsw a.active { background:rgba(255,255,255,.12); color:#fff; }
 
+  /* two-column blocks collapse to one column on narrow screens */
+  @media (max-width: 900px) {
+    .navlinks { display: none; }
+    .hero-grid { grid-template-columns: 1fr !important; }
+    .hero-text { text-align: center !important; }
+    .hero-text p { margin-left: auto !important; margin-right: auto !important; }
+    .hero-ctas { justify-content: center !important; }
+    .zigrow { grid-template-columns: 1fr !important; }
+    .zigrow .zig-vis { order: 2; }
+  }
+
   /* responsive tightening for the design's fixed desktop type scale */
   @media (max-width: 720px) {
     .hero-h1 { font-size: 44px !important; }
@@ -57,37 +68,64 @@
   <!-- ambient glow -->
   <div style="position:absolute; top:-200px; left:50%; transform:translateX(-50%); width:1000px; height:620px; background:radial-gradient(closest-side, rgba(30,215,96,.15), transparent 70%); pointer-events:none;"></div>
 
-  <!-- first screen: nav + hero fill the viewport, hero centered -->
-  <div style="position:relative; min-height:100vh; display:flex; flex-direction:column;">
-
-  <!-- nav -->
-  <nav style="position:relative; max-width:1140px; width:100%; margin:0 auto; padding:40px 34px 0; display:flex; align-items:center; justify-content:space-between;">
-    <div style="display:flex; align-items:center; gap:11px;">
-      <img src="../assets/app-icon.png" alt="Lyrics Widget" style="width:34px; height:34px; display:block; filter:drop-shadow(0 0 1.4px rgba(255,255,255,.5));" />
-      <span style="font:700 16px/1 'Montserrat',sans-serif;">Lyrics&nbsp;Widget</span>
-    </div>
-    <div style="display:flex; align-items:center; gap:14px;">
-      <div class="langsw">
-        <a href="../zh-Hant/index.html" data-lang="zh-Hant">中</a>
-        <a href="../en/index.html" data-lang="en">EN</a>
+  <!-- sticky nav -->
+  <nav style="position:sticky; top:0; z-index:50; background:rgba(10,10,10,.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid rgba(255,255,255,.06);">
+    <div style="max-width:1140px; margin:0 auto; padding:15px 34px; display:flex; align-items:center; justify-content:space-between;">
+      <div style="display:flex; align-items:center; gap:11px;">
+        <img src="../assets/app-icon.png" alt="Lyrics Widget" style="width:30px; height:30px; display:block; filter:drop-shadow(0 0 1.4px rgba(255,255,255,.5));" />
+        <span style="font:700 15px/1 'Montserrat',sans-serif;">Lyrics&nbsp;Widget</span>
       </div>
-      <a href="#dl-2a" style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:9px 17px; border-radius:999px;">{{nav_download}}</a>
+      <div class="navlinks" style="display:flex; align-items:center; gap:26px;">
+        <a href="#feat-2a" style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#c9c9c9; text-decoration:none;">{{nav_features}}</a>
+        <a href="#flow-2a" style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#c9c9c9; text-decoration:none;">{{nav_flow}}</a>
+      </div>
+      <div style="display:flex; align-items:center; gap:14px;">
+        <div class="langsw">
+          <a href="../zh-Hant/index.html" data-lang="zh-Hant">中</a>
+          <a href="../en/index.html" data-lang="en">EN</a>
+        </div>
+        <a href="#dl-2a" style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:9px 17px; border-radius:999px;">{{nav_download}}</a>
+      </div>
     </div>
   </nav>
 
-  <!-- LAUNCH HERO (announcement) — vertically centered in the first screen -->
-  <div style="position:relative; max-width:880px; margin:0 auto; padding:34px 34px 60px; text-align:center; flex:1; display:flex; flex-direction:column; justify-content:center;">
+  <!-- first screen: hero fills the viewport below the sticky nav -->
+  <div style="position:relative; min-height:calc(100vh - 62px); display:flex; flex-direction:column;">
+
+  <!-- LAUNCH HERO — text left, live widget demo right, vertically centered -->
+  <div class="hero-grid" style="position:relative; max-width:1140px; width:100%; margin:0 auto; padding:44px 34px 64px; flex:1; display:grid; grid-template-columns:1.05fr 1fr; align-items:center; gap:48px;">
+    <div class="hero-text" style="text-align:left;">
     <div style="display:inline-flex; align-items:center; gap:9px; font:600 11px/1.4 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:.22em; color:#1ED760; background:rgba(30,215,96,.08); border:1px solid rgba(30,215,96,.24); padding:9px 16px; border-radius:999px; margin-bottom:28px; white-space:nowrap;">
       <span style="width:6px; height:6px; border-radius:50%; background:#1ED760; box-shadow:0 0 10px #1ED760;"></span>{{badge}}
     </div>
-    <h1 class="hero-h1" style="font:900 68px/1.0 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.035em; margin:0 0 20px;">{{h1_pre}}<span style="background:linear-gradient(90deg,#1ED760,#7af0ab); -webkit-background-clip:text; background-clip:text; color:transparent;">{{h1_hl}}</span>{{h1_post}}</h1>
-    <p style="font:400 18px/1.6 'Noto Sans TC',sans-serif; color:#c9c9c9; margin:0 auto 36px; max-width:540px;">{{hero_sub}}</p>
-    <div style="display:flex; align-items:center; justify-content:center; gap:14px; flex-wrap:wrap;">
+    <h1 class="hero-h1" style="font:900 54px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.035em; margin:0 0 20px;">{{h1_pre}}<span style="background:linear-gradient(90deg,#1ED760,#7af0ab); -webkit-background-clip:text; background-clip:text; color:transparent;">{{h1_hl}}</span>{{h1_post}}</h1>
+    <p style="font:400 18px/1.6 'Noto Sans TC',sans-serif; color:#c9c9c9; margin:0 0 36px; max-width:460px;">{{hero_sub}}</p>
+    <div class="hero-ctas" style="display:flex; align-items:center; justify-content:flex-start; gap:14px; flex-wrap:wrap;">
       <a href="#dl-2a" style="display:inline-flex; align-items:center; gap:9px; font:700 15px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:15px 28px; border-radius:999px; box-shadow:0 0 0 1px rgba(30,215,96,.5), 0 14px 40px rgba(30,215,96,.34);">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5v1.5a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-1.5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round"/></svg>
         {{cta_download}}
       </a>
       <a href="#feat-2a" style="font:600 15px 'Montserrat','Noto Sans TC',sans-serif; color:#fff; text-decoration:none; border:1px solid rgba(255,255,255,.16); padding:14px 26px; border-radius:999px;">{{cta_secondary}}</a>
+    </div>
+    </div>
+
+    <!-- hero visual: live widget demo -->
+    <div class="hero-vis" style="position:relative; display:flex; align-items:center; justify-content:center;">
+      <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:520px; height:320px; max-width:100%; background:radial-gradient(closest-side, rgba(30,215,96,.20), transparent 72%); filter:blur(10px); pointer-events:none;"></div>
+      <div style="position:relative; width:470px; max-width:100%; background:rgba(20,20,20,.94); backdrop-filter:blur(10px); border:1.5px solid rgba(30,215,96,.7); border-radius:18px; padding:22px 26px 23px; box-shadow:0 30px 70px rgba(0,0,0,.6), 0 0 38px rgba(30,215,96,.24); text-align:left;">
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
+          <div style="font:500 12px/1 'Montserrat','Noto Sans TC',sans-serif; color:#b3b3b3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{demo_track}}</div>
+          <div style="display:flex; align-items:center; gap:13px; flex:none; opacity:.85;">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.1" stroke="#b3b3b3" stroke-width="1.6"/><path d="M12 2.6l1.3 2.05a7.6 7.6 0 0 1 1.9.79l2.35-.6 1.7 1.7-.6 2.35c.34.6.6 1.23.79 1.9L21.4 12l-2.05 1.3c-.19.67-.45 1.3-.79 1.9l.6 2.35-1.7 1.7-2.35-.6c-.6.34-1.23.6-1.9.79L12 21.4l-1.3-2.05a7.6 7.6 0 0 1-1.9-.79l-2.35.6-1.7-1.7.6-2.35a7.6 7.6 0 0 1-.79-1.9L2.6 12l2.05-1.3c.19-.67.45-1.3.79-1.9l-.6-2.35 1.7-1.7 2.35.6c.6-.34 1.23-.6 1.9-.79L12 2.6z" stroke="#b3b3b3" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            <svg width="13" height="13" viewBox="0 0 13 13"><rect x="2.5" y="6" width="8" height="1.5" rx=".75" fill="#b3b3b3"/></svg>
+            <svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 3l7 7M10 3l-7 7" stroke="#b3b3b3" stroke-width="1.3" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+        <div id="demoLyric" style="text-align:center; font:600 24px/1.4 'Noto Sans TC',sans-serif; color:#1ED760; margin:20px 0 20px; min-height:34px; text-shadow:0 0 22px rgba(30,215,96,.34);">{{demo_init_line}}</div>
+        <div style="display:flex; align-items:center;">
+          <div style="flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden;"><div id="demoProgress" style="height:100%; border-radius:2px; background:#1ED760; width:24%;"></div></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -100,24 +138,6 @@
         <h2 class="show-h2" style="font:800 54px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.025em; margin:0 0 22px;">{{show_h2_pre}}<span style="color:#1ED760;">{{show_h2_hl}}</span></h2>
         <p style="font:400 19px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 auto; max-width:520px;">{{show_p}}</p>
       </div>
-      <!-- enlarged floating widget (premium hero showcase) -->
-      <div style="position:relative; display:flex; align-items:center; justify-content:center; padding:24px 0 28px;">
-        <div style="position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); width:640px; height:380px; max-width:96%; background:radial-gradient(closest-side, rgba(30,215,96,.22), transparent 72%); filter:blur(10px); pointer-events:none;"></div>
-        <div style="position:relative; width:560px; max-width:92vw; background:rgba(20,20,20,.94); backdrop-filter:blur(10px); border:1.5px solid rgba(30,215,96,.7); border-radius:20px; padding:26px 30px 27px; box-shadow:0 36px 80px rgba(0,0,0,.62), 0 0 44px rgba(30,215,96,.26); text-align:left;">
-          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-            <div style="font:500 12px/1 'Montserrat','Noto Sans TC',sans-serif; color:#b3b3b3; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">{{demo_track}}</div>
-            <div style="display:flex; align-items:center; gap:13px; flex:none; opacity:.85;">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="3.1" stroke="#b3b3b3" stroke-width="1.6"/><path d="M12 2.6l1.3 2.05a7.6 7.6 0 0 1 1.9.79l2.35-.6 1.7 1.7-.6 2.35c.34.6.6 1.23.79 1.9L21.4 12l-2.05 1.3c-.19.67-.45 1.3-.79 1.9l.6 2.35-1.7 1.7-2.35-.6c-.6.34-1.23.6-1.9.79L12 21.4l-1.3-2.05a7.6 7.6 0 0 1-1.9-.79l-2.35.6-1.7-1.7.6-2.35a7.6 7.6 0 0 1-.79-1.9L2.6 12l2.05-1.3c.19-.67.45-1.3.79-1.9l-.6-2.35 1.7-1.7 2.35.6c.6-.34 1.23-.6 1.9-.79L12 2.6z" stroke="#b3b3b3" stroke-width="1.4" stroke-linejoin="round"/></svg>
-              <svg width="13" height="13" viewBox="0 0 13 13"><rect x="2.5" y="6" width="8" height="1.5" rx=".75" fill="#b3b3b3"/></svg>
-              <svg width="13" height="13" viewBox="0 0 13 13"><path d="M3 3l7 7M10 3l-7 7" stroke="#b3b3b3" stroke-width="1.3" stroke-linecap="round"/></svg>
-            </div>
-          </div>
-          <div id="demoLyric" style="text-align:center; font:600 30px/1.4 'Noto Sans TC',sans-serif; color:#1ED760; margin:22px 0 22px; min-height:42px; text-shadow:0 0 22px rgba(30,215,96,.34);">{{demo_init_line}}</div>
-          <div style="display:flex; align-items:center;">
-            <div style="flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden;"><div id="demoProgress" style="height:100%; border-radius:2px; background:#1ED760; width:24%;"></div></div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -127,36 +147,81 @@
       <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">{{feat_title}}</h2>
       <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">{{feat_kicker}}</span>
     </div>
-    <div class="grid-3" style="display:grid; grid-template-columns:repeat(3,1fr); gap:18px;">
-      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:26px 24px;">
-        <div style="width:46px; height:46px; border-radius:12px; background:rgba(30,215,96,.12); display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><circle cx="11" cy="11" r="8" stroke="#1ED760" stroke-width="2"/><circle cx="11" cy="11" r="2.6" fill="#1ED760"/></svg>
-        </div>
-        <h3 style="font:700 19px/1.2 'Noto Sans TC',sans-serif; margin:0 0 4px;">{{f1_h3}}</h3>
-        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:12px;">{{f1_mono}}</div>
-        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">{{f1_p}}</p>
+    <!-- zigzag row 1: synced lyrics (text | visual) -->
+    <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
+      <div class="zig-text">
+        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:10px;">{{f1_mono}}</div>
+        <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">{{f1_h3}}</h3>
+        <p style="font:400 15px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0; max-width:400px;">{{f1_p}}</p>
       </div>
-      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:26px 24px;">
-        <div style="width:46px; height:46px; border-radius:12px; background:rgba(30,215,96,.12); display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><polyline points="4,13 11,6 18,13" stroke="#1ED760" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><polyline points="4,18 11,11 18,18" stroke="#1ED760" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+      <div class="zig-vis" style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; min-height:210px;">
+        <div style="width:52%; height:10px; border-radius:5px; background:rgba(255,255,255,.10);"></div>
+        <div style="width:74%; height:14px; border-radius:7px; background:#1ED760; box-shadow:0 0 18px rgba(30,215,96,.45);"></div>
+        <div style="width:46%; height:10px; border-radius:5px; background:rgba(255,255,255,.10);"></div>
+        <div style="display:flex; align-items:center; gap:10px; width:80%; margin-top:12px;">
+          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">0:58</span>
+          <div style="flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden;"><div style="height:100%; width:42%; background:#1ED760; border-radius:2px;"></div></div>
+          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">2:16</span>
         </div>
-        <h3 style="font:700 19px/1.2 'Noto Sans TC',sans-serif; margin:0 0 4px;">{{f2_h3}}</h3>
-        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:12px;">{{f2_mono}}</div>
-        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">{{f2_p}}</p>
       </div>
-      <div style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:26px 24px;">
-        <div style="width:46px; height:46px; border-radius:12px; background:rgba(30,215,96,.12); display:flex; align-items:center; justify-content:center; margin-bottom:20px;">
-          <svg width="22" height="22" viewBox="0 0 22 22" fill="none"><rect x="3.4" y="4" width="15.2" height="8" rx="1.8" stroke="#1ED760" stroke-width="2"/><rect x="3" y="15" width="16" height="3.6" rx="1.4" fill="#1ED760"/><rect x="4.6" y="16.1" width="3.4" height="1.4" rx=".6" fill="#0a1f12"/></svg>
+    </div>
+
+    <!-- zigzag row 2: always on top (visual | text) -->
+    <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
+      <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; min-height:230px; overflow:hidden;">
+        <div style="position:absolute; left:8%; top:22%; width:52%; height:56%; border-radius:10px; background:#1d1d1d; border:1px solid rgba(255,255,255,.08);">
+          <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.07); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);"></span></div>
         </div>
-        <h3 style="font:700 19px/1.2 'Noto Sans TC',sans-serif; margin:0 0 4px;">{{f3_h3}}</h3>
-        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:12px;">{{f3_mono}}</div>
-        <p style="font:400 14px/1.65 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0;">{{f3_p}}</p>
+        <div style="position:absolute; left:24%; top:36%; width:52%; height:56%; border-radius:10px; background:#242424; border:1px solid rgba(255,255,255,.10);">
+          <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);"></span></div>
+        </div>
+        <div style="position:absolute; right:7%; top:14%; width:44%; border-radius:12px; background:rgba(20,20,20,.96); border:1.5px solid rgba(30,215,96,.7); box-shadow:0 14px 34px rgba(0,0,0,.55), 0 0 22px rgba(30,215,96,.25); padding:13px 15px;">
+          <div style="height:6px; width:58%; border-radius:3px; background:rgba(255,255,255,.16); margin-bottom:9px;"></div>
+          <div style="height:9px; width:84%; border-radius:4px; background:#1ED760; box-shadow:0 0 10px rgba(30,215,96,.4);"></div>
+        </div>
+      </div>
+      <div class="zig-text">
+        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:10px;">{{f2_mono}}</div>
+        <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">{{f2_h3}}</h3>
+        <p style="font:400 15px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0; max-width:400px;">{{f2_p}}</p>
+      </div>
+    </div>
+
+    <!-- zigzag row 3: taskbar controller (text | visual) -->
+    <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center;">
+      <div class="zig-text">
+        <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:10px;">{{f3_mono}}</div>
+        <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">{{f3_h3}}</h3>
+        <p style="font:400 15px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0; max-width:400px;">{{f3_p}}</p>
+      </div>
+      <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; min-height:230px; padding:26px; display:flex; flex-direction:column; justify-content:flex-end;">
+        <div style="position:absolute; right:44px; bottom:86px; width:132px; background:#1d1d1d; border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:7px 0; box-shadow:0 14px 30px rgba(0,0,0,.5);">
+          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#e8e8e8; padding:8px 14px;">{{tb_run}}</div>
+          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#e8e8e8; padding:8px 14px; background:rgba(30,215,96,.10);">{{tb_show}}</div>
+          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#e8e8e8; padding:8px 14px;">{{tb_hide}}</div>
+          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#ff7b7b; padding:8px 14px; border-top:1px solid rgba(255,255,255,.07); margin-top:4px;">{{tb_close}}</div>
+        </div>
+        <div style="display:flex; align-items:center; gap:12px; background:#1a1a1a; border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:10px 16px;">
+          <div style="width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,.10);"></div>
+          <div style="width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,.10);"></div>
+          <div style="position:relative; width:26px; height:26px; display:flex; align-items:center; justify-content:center;">
+            <img src="../assets/app-icon.png" alt="" style="width:22px; height:22px; display:block;" />
+            <span style="position:absolute; left:50%; transform:translateX(-50%); bottom:-7px; width:16px; height:2.5px; border-radius:2px; background:#1ED760;"></span>
+          </div>
+          <div style="flex:1;"></div>
+          <div style="display:flex; gap:5px;">
+            <span style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.30);"></span>
+            <span style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.30);"></span>
+            <span style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.30);"></span>
+          </div>
+          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">13:24</span>
+        </div>
       </div>
     </div>
   </div>
 
   <!-- WORKFLOW -->
-  <div style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
+  <div id="flow-2a" style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
     <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:42px;">
       <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">{{flow_title}}</h2>
       <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">{{flow_kicker}}</span>

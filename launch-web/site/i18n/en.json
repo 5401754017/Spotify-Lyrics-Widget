@@ -6,6 +6,8 @@
   "og_desc": "See the current track, synced lyrics, and playback progress right on top of your desktop. Windows 11 · free & open source.",
 
   "nav_download": "Download Installer",
+  "nav_features": "Features",
+  "nav_flow": "How it works",
 
   "badge": "WINDOWS 11 · NOW AVAILABLE",
   "h1_pre": "Desktop lyrics, ",
@@ -32,6 +34,10 @@
   "f3_h3": "Taskbar controller",
   "f3_mono": "Taskbar Controller",
   "f3_p": "Lives in the Windows taskbar and system tray, so you can run, show, hide, or close the widget anytime.",
+  "tb_run": "Run Widget",
+  "tb_show": "Show",
+  "tb_hide": "Hide",
+  "tb_close": "Close",
 
   "flow_title": "How it works",
   "flow_kicker": "Three steps",
