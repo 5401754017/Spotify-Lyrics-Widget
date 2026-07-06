@@ -52,6 +52,13 @@
     .zigrow .zig-vis { order: 2; }
   }
 
+  /* scroll-in reveal — gated on .js so no-JS users still see everything */
+  .js .reveal { opacity:0; transform:translateY(22px); transition:opacity .7s ease, transform .7s cubic-bezier(.2,.65,.2,1); will-change:opacity, transform; }
+  .js .reveal.is-visible { opacity:1; transform:none; }
+  @media (prefers-reduced-motion: reduce) {
+    .js .reveal { opacity:1 !important; transform:none !important; transition:none !important; }
+  }
+
   /* responsive tightening for the design's fixed desktop type scale */
   @media (max-width: 720px) {
     .hero-h1 { font-size: 44px !important; }
@@ -61,6 +68,7 @@
     .dl-side { border-left: none !important; border-top: 1px solid rgba(30,215,96,.18) !important; }
   }
 </style>
+<script>document.documentElement.className += ' js';</script>
 </head>
 <body>
 
@@ -137,7 +145,7 @@
   <!-- PRODUCT SHOWCASE band (value prop + in-context mock) -->
   <div style="background:#121212; border-top:1px solid rgba(255,255,255,.05);">
     <div style="max-width:1140px; margin:0 auto; padding:88px 34px 104px; display:flex; flex-direction:column; align-items:center; text-align:center; gap:58px;">
-      <div style="max-width:660px;">
+      <div class="reveal" style="max-width:660px;">
         <h2 class="show-h2" style="font:800 54px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.025em; margin:0 0 22px;">Always on your desktop, <span style="color:#1ED760;">synced lyrics</span></h2>
         <p style="font:400 19px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 auto; max-width:520px;">The current track, line-by-line synced lyrics, and playback progress — right on top of your desktop.</p>
       </div>
@@ -146,12 +154,12 @@
 
   <!-- FEATURES -->
   <div id="feat-2a" style="max-width:1140px; margin:0 auto; padding:84px 34px 0;">
-    <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:34px;">
+    <div class="reveal" style="display:flex; align-items:baseline; gap:14px; margin-bottom:34px;">
       <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">Core features</h2>
       <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">What it does</span>
     </div>
     <!-- zigzag row 1: synced lyrics (text | visual) -->
-    <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
+    <div class="zigrow reveal" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
       <div class="zig-text">
         <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:10px;">Synced Lyrics</div>
         <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">Line-by-line synced lyrics</h3>
@@ -179,7 +187,7 @@
     </div>
 
     <!-- zigzag row 2: always on top (visual | text) -->
-    <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
+    <div class="zigrow reveal" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
       <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.08); border-radius:16px; min-height:230px; overflow:hidden;">
         <div style="position:absolute; left:8%; top:22%; width:52%; height:56%; border-radius:10px; background:#2a2a2a; border:1px solid rgba(255,255,255,.16);">
           <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.12); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.30);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.30);"></span></div>
@@ -200,7 +208,7 @@
     </div>
 
     <!-- zigzag row 3: taskbar controller (text | visual) -->
-    <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center;">
+    <div class="zigrow reveal" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center;">
       <div class="zig-text">
         <div style="font:500 12px 'IBM Plex Mono',monospace; color:#1ED760; margin-bottom:10px;">Taskbar Controller</div>
         <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">Taskbar controller</h3>
@@ -231,12 +239,6 @@
           </div>
         </div>
 
-        <!-- tray context menu -->
-        <div style="position:absolute; right:6%; bottom:52px; width:130px; background:#1f1f1f; border:1px solid rgba(255,255,255,.16); border-radius:8px; padding:5px 0; box-shadow:0 16px 34px rgba(0,0,0,.55);">
-          <div style="font:400 12px 'Montserrat',sans-serif; color:#e8e8e8; padding:7px 13px; background:rgba(30,215,96,.12);">Open / Hide</div>
-          <div style="font:400 12px 'Montserrat',sans-serif; color:#e8e8e8; padding:7px 13px;">Close Widget</div>
-        </div>
-
         <!-- taskbar with system tray -->
         <div style="position:absolute; left:0; right:0; bottom:0; height:40px; background:#0d0d0d; border-top:1px solid rgba(255,255,255,.09); display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 16px;">
           <span style="width:16px; height:16px; border-radius:3px; background:rgba(255,255,255,.14);"></span>
@@ -251,7 +253,7 @@
   </div>
 
   <!-- WORKFLOW -->
-  <div id="flow-2a" style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
+  <div id="flow-2a" class="reveal" style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
     <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:42px;">
       <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">How it works</h2>
       <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">Three steps</span>
@@ -279,7 +281,7 @@
   </div>
 
   <!-- LYRICS SOURCE (benefit-framed) -->
-  <div style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
+  <div class="reveal" style="max-width:1140px; margin:0 auto; padding:80px 34px 0;">
     <div style="display:flex; align-items:baseline; gap:14px; margin-bottom:28px;">
       <h2 style="font:800 30px/1.1 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.02em; margin:0;">Lyrics that show up</h2>
       <span style="font:500 13px 'IBM Plex Mono',monospace; color:#6a6a6a;">Two sources</span>
@@ -298,7 +300,7 @@
   </div>
 
   <!-- DOWNLOAD (README-accurate) -->
-  <div id="dl-2a" style="max-width:1140px; margin:0 auto; padding:80px 34px 96px;">
+  <div id="dl-2a" class="reveal" style="max-width:1140px; margin:0 auto; padding:80px 34px 96px;">
     <div style="position:relative; overflow:hidden; background:linear-gradient(135deg,#16281d 0%,#101512 60%,#0c0c0c 100%); border:1px solid rgba(30,215,96,.24); border-radius:22px;">
       <div class="dl-grid" style="display:grid; grid-template-columns:1.15fr 1fr; align-items:stretch;">
         <div style="position:relative; padding:54px 46px;">
@@ -356,6 +358,31 @@
 </section>
 
 <script>
+  // Reveal blocks as they scroll into view (no-op under reduced-motion).
+  (function () {
+    var els = [].slice.call(document.querySelectorAll('.reveal'));
+    if (!els.length) return;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (reduce) {
+      els.forEach(function (el) { el.classList.add('is-visible'); });
+      return;
+    }
+    function check() {
+      var h = window.innerHeight || document.documentElement.clientHeight;
+      for (var i = els.length - 1; i >= 0; i--) {
+        var r = els[i].getBoundingClientRect();
+        if (r.top < h * 0.88 && r.bottom > 0) { els[i].classList.add('is-visible'); els.splice(i, 1); }
+      }
+      if (!els.length) {
+        window.removeEventListener('scroll', check);
+        window.removeEventListener('resize', check);
+      }
+    }
+    window.addEventListener('scroll', check, { passive: true });
+    window.addEventListener('resize', check);
+    check(); // reveal whatever is already in view on load
+  })();
+
   // Highlight the active language in the switcher and remember the choice.
   (function () {
     var cur = document.documentElement.lang;
