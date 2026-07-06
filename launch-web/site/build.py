@@ -20,6 +20,12 @@ SITE = Path(__file__).resolve().parent
 TEMPLATE = SITE / "template.html"
 I18N = SITE / "i18n"
 
+# Single source of truth for the release. Bump this on a new release and the
+# version badge + every download button update together.
+REPO = "https://github.com/5401754017/Spotify-Lyrics-Widget"
+VERSION = "v3.2.1"
+DOWNLOAD_URL = f"{REPO}/releases/download/{VERSION}/SpotifyLyricsWidgetSetup.exe"
+
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
 
@@ -29,6 +35,8 @@ def render(lang: str) -> None:
 
     values = dict(data)
     values["LANG"] = data["lang"]
+    values["version"] = VERSION
+    values["download_url"] = DOWNLOAD_URL
     values["demo_lines_json"] = json.dumps(lines, ensure_ascii=False)
     values["demo_init_line"] = lines[1] if len(lines) > 1 else lines[0]
 
