@@ -314,12 +314,31 @@ def test_set_lyrics_updates_current_line_when_paused(qtbot):
     assert widget._lyric_label.text() == "Line 1"
 
 
-def test_lyric_blanks_after_incomplete_source_runs_out(qtbot):
+def test_lyric_shows_note_after_incomplete_source_runs_out(qtbot):
     widget = LyricsWidget()
     qtbot.addWidget(widget)
     widget.set_duration(118000)
     widget.set_lyrics([(2000, "Line 1"), (8000, "Line 2")])  # only covers 8s of 118s
     widget.resync_local_timer(20000, False, time.monotonic())
+    assert widget._lyric_label.text() == "♪"
+
+
+def test_lyric_shows_note_during_intro_before_first_line(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(180000)
+    widget.set_lyrics([(5000, "Line 1"), (10000, "Line 2")])
+    widget.resync_local_timer(1000, False, time.monotonic())  # 1s in, before first line at 5s
+    assert widget._lyric_label.text() == "♪"
+
+
+def test_lyric_stays_blank_while_waiting_for_lyrics(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(180000)
+    widget.set_lyric_text("")
+    widget.set_lyrics([])  # lyrics not fetched yet; distinct from intro
+    widget.resync_local_timer(1000, False, time.monotonic())
     assert widget._lyric_label.text() == ""
 
 

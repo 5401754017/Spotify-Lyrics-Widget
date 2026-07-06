@@ -39,6 +39,8 @@ WHITE = "#FFFFFF"
 SPOTIFY_GREEN = "#1DB954"
 DARK_GRAY = "#282828"
 
+MUSIC_NOTE = "♪"  # lyrics loaded but none to show now (intro/outro/incomplete tail)
+
 UI_TIMER_INTERVAL_MS = 150
 WIDGET_WIDTH = 420
 WIDGET_HEIGHT = 112
@@ -260,6 +262,7 @@ class LyricsWidget(QWidget):
     hide_requested = pyqtSignal()
     size_preset_requested = pyqtSignal(str)
 
+    _UNSET = -3  # _current_line_idx sentinel: fresh lyrics, force first paint
     _TAIL_BLANKED = -2  # _current_line_idx sentinel: past an incomplete source's end
 
     def __init__(self):
@@ -271,7 +274,7 @@ class LyricsWidget(QWidget):
         self._setup_timer()
 
         self._lyrics: list[tuple[int, str]] = []
-        self._current_line_idx = -1
+        self._current_line_idx = self._UNSET
         self._last_synced_ms = 0
         self._last_sync_time = 0.0
         self._is_playing = False
@@ -471,7 +474,7 @@ class LyricsWidget(QWidget):
 
     def set_lyrics(self, lyrics: list[tuple[int, str]]):
         self._lyrics = lyrics
-        self._current_line_idx = -1
+        self._current_line_idx = self._UNSET
         if not self._is_playing:
             self._update_lyric_display(self._last_synced_ms)
 
@@ -580,7 +583,7 @@ class LyricsWidget(QWidget):
             if self._current_line_idx == self._TAIL_BLANKED:
                 return
             self._current_line_idx = self._TAIL_BLANKED
-            self._lyric_label.setText("")
+            self._lyric_label.setText(MUSIC_NOTE)
             return
 
         index = find_current_line(self._lyrics, progress_ms)
@@ -590,6 +593,8 @@ class LyricsWidget(QWidget):
         self._current_line_idx = index
         if index >= 0:
             self.set_lyric_text(self._lyrics[index][1])
+        elif self._lyrics:
+            self._lyric_label.setText(MUSIC_NOTE)  # lyrics loaded, before the first line
         else:
             self._lyric_label.setText("")
 
