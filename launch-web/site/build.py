@@ -20,11 +20,17 @@ SITE = Path(__file__).resolve().parent
 TEMPLATE = SITE / "template.html"
 I18N = SITE / "i18n"
 
-# Single source of truth for the release. Bump this on a new release and the
-# version badge + every download button update together.
-REPO = "https://github.com/5401754017/Spotify-Lyrics-Widget"
+# Single source of truth. Change USER if the GitHub username changes, or
+# REPO_NAME / VERSION on a rename or new release — every GitHub link, the
+# Pages OG image URL, the version badge, and all download buttons follow.
+USER = "5401754017"
+REPO_NAME = "Spotify-Lyrics-Widget"
 VERSION = "v3.2.1"
+
+REPO = f"https://github.com/{USER}/{REPO_NAME}"
+PAGES_BASE = f"https://{USER}.github.io/{REPO_NAME}"
 DOWNLOAD_URL = f"{REPO}/releases/download/{VERSION}/SpotifyLyricsWidgetSetup.exe"
+OG_IMAGE = f"{PAGES_BASE}/assets/og.png"
 
 PLACEHOLDER = re.compile(r"\{\{(\w+)\}\}")
 
@@ -36,7 +42,9 @@ def render(lang: str) -> None:
     values = dict(data)
     values["LANG"] = data["lang"]
     values["version"] = VERSION
+    values["repo"] = REPO
     values["download_url"] = DOWNLOAD_URL
+    values["og_image"] = OG_IMAGE
     values["demo_lines_json"] = json.dumps(lines, ensure_ascii=False)
     values["demo_init_line"] = lines[1] if len(lines) > 1 else lines[0]
 
