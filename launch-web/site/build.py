@@ -23,7 +23,7 @@ I18N = SITE / "i18n"
 # Single source of truth. Change USER if the GitHub username changes, or
 # REPO_NAME / VERSION on a rename or new release — every GitHub link, the
 # Pages OG image URL, the version badge, and all download buttons follow.
-USER = "5401754017"
+USER = "AgendaLin"
 REPO_NAME = "Spotify-Lyrics-Widget"
 VERSION = "v3.2.1"
 

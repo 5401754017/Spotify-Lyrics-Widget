@@ -2,7 +2,7 @@
 
 Spotify Lyrics Widget 的產品介紹頁，繁中 + 英文雙語，靜態網站，部署在 GitHub Pages。
 
-線上網址：<https://5401754017.github.io/Spotify-Lyrics-Widget/>
+線上網址：<https://AgendaLin.github.io/Spotify-Lyrics-Widget/>
 
 ## 結構
 
@@ -59,7 +59,7 @@ VERSION = "v3.2.1"   # ← 改成新版
 改 `site/build.py`：
 
 ```python
-USER = "5401754017"            # ← 新 username
+USER = "AgendaLin"             # ← 新 username
 REPO_NAME = "Spotify-Lyrics-Widget"
 ```
 
