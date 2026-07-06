@@ -19,8 +19,12 @@
 <meta property="og:type" content="website">
 <meta property="og:title" content="{{og_title}}">
 <meta property="og:description" content="{{og_desc}}">
-<meta property="og:image" content="../assets/app-icon.png">
+<meta property="og:image" content="../assets/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="Lyrics Widget — 桌面同步歌詞">
 <meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="../assets/og.png">
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -369,13 +373,10 @@
     }
     function check() {
       var h = window.innerHeight || document.documentElement.clientHeight;
-      for (var i = els.length - 1; i >= 0; i--) {
+      for (var i = 0; i < els.length; i++) {
         var r = els[i].getBoundingClientRect();
-        if (r.top < h * 0.88 && r.bottom > 0) { els[i].classList.add('is-visible'); els.splice(i, 1); }
-      }
-      if (!els.length) {
-        window.removeEventListener('scroll', check);
-        window.removeEventListener('resize', check);
+        // toggle so blocks re-animate each time they re-enter the viewport
+        els[i].classList.toggle('is-visible', r.top < h * 0.9 && r.bottom > h * 0.06);
       }
     }
     window.addEventListener('scroll', check, { passive: true });
