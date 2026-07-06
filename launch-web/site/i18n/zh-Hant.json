@@ -14,7 +14,7 @@
   "h1_hl": "正式登場",
   "h1_post": "。",
   "hero_sub": "一鍵 Windows Installer、三種尺寸與穩定的工作列控制。",
-  "cta_download": "下載 Installer",
+  "cta_download": "下載",
   "cta_secondary": "看看能做什麼 ↓",
 
   "show_h2_pre": "永遠懸浮桌面的",
@@ -57,9 +57,12 @@
 
   "dl_title": "立即開始",
   "dl_p": "下載 Windows Installer，一鍵安裝、自動建立開始功能表捷徑。",
-  "download_url": "#",
+  "download_url": "https://github.com/5401754017/Spotify-Lyrics-Widget/releases/download/v3.2.1/SpotifyLyricsWidgetSetup.exe",
   "dl_button": "下載 SpotifyLyricsWidgetSetup.exe",
   "dl_note": "Windows 11 · 設定與 token 保存在電腦 · 更新重裝不流失",
+  "releases_label": "版本紀錄",
+  "source_label": "原始碼",
+  "license_label": "MIT 授權",
   "setup_title": "第一次設定 · 3 步",
   "s1_h4": "安裝並開啟",
   "s1_p": "從 Start Menu 開啟 SpotifyLyricsWidget。",

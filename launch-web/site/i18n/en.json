@@ -14,7 +14,7 @@
   "h1_hl": "officially here",
   "h1_post": ".",
   "hero_sub": "A one-click Windows installer, three widget sizes, and a rock-solid taskbar controller.",
-  "cta_download": "Download Installer",
+  "cta_download": "Download",
   "cta_secondary": "See what it does ↓",
 
   "show_h2_pre": "Always on your desktop, ",
@@ -57,9 +57,12 @@
 
   "dl_title": "Get started",
   "dl_p": "Download the Windows installer for a one-click setup that adds a Start Menu shortcut automatically.",
-  "download_url": "#",
+  "download_url": "https://github.com/5401754017/Spotify-Lyrics-Widget/releases/download/v3.2.1/SpotifyLyricsWidgetSetup.exe",
   "dl_button": "Download SpotifyLyricsWidgetSetup.exe",
   "dl_note": "Windows 11 · Settings and tokens stay on your PC · Preserved across reinstalls",
+  "releases_label": "Release notes",
+  "source_label": "Source",
+  "license_label": "MIT License",
   "setup_title": "First-time setup · 3 steps",
   "s1_h4": "Install and open",
   "s1_p": "Open SpotifyLyricsWidget from the Start Menu.",

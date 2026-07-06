@@ -4,11 +4,13 @@
 >
 > 注意：下方歷史版本區塊會保留已移除功能，例如 V2 playback controls。判斷目前產品行為時，以「目前實作版本」、「目前已完成」和 V3.2 區塊為準。
 
-最後更新：2026年6月30日
+最後更新：2026年7月6日
 
-目前實作版本：V3.2 installer-only release + language-aware onboarding
+目前實作版本：V3.2.1 歌詞來源品質修正 + 音符指示（在 V3.2 installer-only + language-aware onboarding 之上）
 
-下一步：build app folder、build installer、做外部乾淨環境 smoke test、考慮 code signing / antivirus false-positive 處理。
+已發佈：public GitHub repo `https://github.com/5401754017/Spotify-Lyrics-Widget`，Release `v3.2.1` 已掛 `SpotifyLyricsWidgetSetup.exe`，含 MIT LICENSE 與三語 README。
+
+下一步：外部乾淨環境 smoke test、code signing / antivirus false-positive 處理、playlist add（deferred）。
 
 ---
 
@@ -24,8 +26,11 @@
 - Windows 11 DWM 圓角與 Spotify 綠色系統邊框
 - Spotify OAuth PKCE 授權與 token refresh
 - 每秒 poll Spotify currently-playing，更新歌名、歌手、播放狀態、進度條
-- LRCLIB 作為主要同步歌詞來源
+- LRCLIB 作為主要同步歌詞來源；精確查詢找不到時，會放寬成 track-only（剝掉 `- Original Mix` 等後綴）重試一次，找掛在 remix/別名下的歌詞
+- 歌詞候選排名有 wrong-title gate：歌名完全不吻合就剔除，就算藝人吻合也不採用，避免拿同藝人別首歌的歌詞
 - NetEase 作為 fallback：LRCLIB 確認沒有同步歌詞時啟用；LRCLIB 暫時不可用時也會補救查一次
+- 歌詞已載入但當下沒有可顯示的行（前奏、尾段空檔）時顯示 `♪`；還在抓歌詞時維持空白，兩者可區分
+- 殘缺歌詞來源（覆蓋率過低）播到最後不再卡在最後一句，超過最後 timestamp 一段時間後留白顯示 `♪`
 - 歌詞 transient failure 不寫入 no-lyrics cache，避免暫時 timeout 變成永久無歌詞
 - 中文歌詞 fallback 會做 Traditional/Simplified matching，顯示時轉為繁體
 - taskbar controller：可 Run / Show / Hide / Close widget，並保留穩定 Windows taskbar 入口
@@ -39,7 +44,7 @@
 - V3.2 first-run trigger：缺少 `client_id` 時，第一次開啟 app 會自動進入 Client ID 設定，不需要先按 controller 的 Run Widget
 - V3.2 installer shell refresh：`ie4uinit.exe -show` 必須 `nowait`，避免 installer 卡在 Finishing installation
 
-最新完整測試紀錄：`288 passed`（2026-06-30，V3.2 installer-only + language + first-run trigger）
+最新完整測試紀錄：`303 passed`（2026-07-06，V3.2.1 歌詞來源修正 + 音符指示）
 
 ---
 
@@ -299,10 +304,36 @@ V3.2 決定 installer 成為唯一正式發佈產物，不再額外產 portable 
 
 ---
 
+## V3.2.1 歌詞來源品質修正 + 音符指示
+
+實機播歌時發現多個歌詞來源品質問題，本版針對來源選取與顯示做修正。
+
+實作內容：
+
+- `src/lyrics_worker.py` / `src/netease.py`：候選排名加 wrong-title gate，歌名完全不吻合直接剔除（先前只在歌名+藝人都不吻合才拒絕，導致同藝人別首歌的歌詞被誤用，例如 Novocaine 拿到 So Innocent）。
+- `src/lyrics_worker.py`：LRCLIB 精確查詢（track+artist）找不到時，新增放寬 /search 重試（track-only、剝掉 `- Original Mix` 等後綴），能找到掛在 remix/別名下的歌詞。
+- `src/lrc_parser.py`：新增 `should_blank_incomplete_tail`；殘缺來源播到超過最後 timestamp 一段時間、且尾段占比過大時，改為留白而不是卡在最後一句。
+- `src/widget.py`：新增 `♪` 指示。歌詞已載入但當下沒有可顯示行（前奏、尾段）顯示 `♪`；等待 API 期間維持空白，兩者可區分。用獨立 sentinel `_UNSET` 讓換歌後第一次重繪能正確畫出前奏 `♪`。
+
+決策紀錄（本版評估後暫不做）：
+
+- Runaway 開頭出現俄文，是 LRCLIB 該筆資料被塞了一行垃圾，且它是唯一 album 標對的條目、`/get` 必然回它。評估過「剝除頭尾異語系孤立行」與「污染嚴重才 fallback /search」，因個案少暫不做。
+- Losing Interest 只有 4 行是 NetEase 殘缺來源；已改用投稿乾淨 LRC 到 LRCLIB 解決個案，並靠放寬查詢涵蓋同類。
+
+驗證：
+
+- Full suite：`303 passed`
+
+發佈：
+
+- `installer/SpotifyLyricsWidget.iss` 版本 metadata 升到 `3.2.1`。
+- 建 public GitHub repo `Spotify-Lyrics-Widget`，push master，建 Release `v3.2.1` 上傳 `SpotifyLyricsWidgetSetup.exe`。
+- 新增 MIT `LICENSE`、三語（EN / 繁中 / 简中）README 含截圖與下載連結。
+
+---
+
 ## 建議下一步
 
-1. 跑 `scripts\build_app.ps1`，再跑 `scripts\build_installer.ps1`。
-2. 做外部乾淨環境 smoke test：選 English / 繁中安裝、首次設定 Spotify Client ID、OAuth、播放中歌詞顯示、解除安裝。
-3. 處理 antivirus false-positive / code signing。
-4. LICENSE 檔案。
-5. Playlist add / default playlist（deferred）。
+1. 做外部乾淨環境 smoke test：選 English / 繁中安裝、首次設定 Spotify Client ID、OAuth、播放中歌詞顯示、解除安裝。
+2. 處理 antivirus false-positive / code signing。
+3. Playlist add / default playlist（deferred）。
