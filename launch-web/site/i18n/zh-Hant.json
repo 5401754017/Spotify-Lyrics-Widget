@@ -34,10 +34,6 @@
   "f3_h3": "工作列控制器",
   "f3_mono": "Taskbar Controller",
   "f3_p": "常駐 Windows 工作列與系統匣，隨時可執行、顯示、隱藏或關閉 widget。",
-  "tb_run": "執行 Widget",
-  "tb_show": "顯示",
-  "tb_hide": "隱藏",
-  "tb_close": "關閉",
 
   "flow_title": "運作流程",
   "flow_kicker": "How it works",

@@ -154,29 +154,38 @@
         <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">Line-by-line synced lyrics</h3>
         <p style="font:400 15px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0; max-width:400px;">Aligned to Spotify's playback every second — the current line lights up as it's sung, shown in up to two clean lines.</p>
       </div>
-      <div class="zig-vis" style="background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; padding:34px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:14px; min-height:210px;">
-        <div style="width:52%; height:10px; border-radius:5px; background:rgba(255,255,255,.10);"></div>
-        <div style="width:74%; height:14px; border-radius:7px; background:#1ED760; box-shadow:0 0 18px rgba(30,215,96,.45);"></div>
-        <div style="width:46%; height:10px; border-radius:5px; background:rgba(255,255,255,.10);"></div>
-        <div style="display:flex; align-items:center; gap:10px; width:80%; margin-top:12px;">
-          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">0:58</span>
-          <div style="flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden;"><div style="height:100%; width:42%; background:#1ED760; border-radius:2px;"></div></div>
-          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">2:16</span>
+      <div class="zig-vis" style="background:#161616; border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:34px; display:flex; align-items:center; justify-content:center; min-height:210px;">
+        <!-- mini widget: the real product shows only the currently sung line -->
+        <div style="width:84%; background:rgba(20,20,20,.96); border:1.5px solid rgba(30,215,96,.55); border-radius:14px; padding:18px 22px; box-shadow:0 18px 44px rgba(0,0,0,.5), 0 0 26px rgba(30,215,96,.16);">
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:16px;">
+            <div style="width:46%; height:8px; border-radius:4px; background:rgba(255,255,255,.18);"></div>
+            <div style="display:flex; align-items:flex-end; gap:3px; height:14px;">
+              <span style="width:3px; height:100%; border-radius:2px; background:#1ED760; transform-origin:bottom; animation:eq 1s ease-in-out infinite;"></span>
+              <span style="width:3px; height:100%; border-radius:2px; background:#1ED760; transform-origin:bottom; animation:eq 1s ease-in-out .2s infinite;"></span>
+              <span style="width:3px; height:100%; border-radius:2px; background:#1ED760; transform-origin:bottom; animation:eq 1s ease-in-out .4s infinite;"></span>
+            </div>
+          </div>
+          <div style="width:88%; height:15px; border-radius:8px; margin:0 auto 18px; background:#1ED760; box-shadow:0 0 20px rgba(30,215,96,.5); animation:glowpulse 2.2s ease-in-out infinite;"></div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">0:58</span>
+            <div style="flex:1; height:4px; border-radius:2px; background:rgba(255,255,255,.14); overflow:hidden;"><div style="height:100%; width:42%; background:#1ED760; border-radius:2px;"></div></div>
+            <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">2:16</span>
+          </div>
         </div>
       </div>
     </div>
 
     <!-- zigzag row 2: always on top (visual | text) -->
     <div class="zigrow" style="display:grid; grid-template-columns:1fr 1fr; gap:46px; align-items:center; margin-bottom:64px;">
-      <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; min-height:230px; overflow:hidden;">
-        <div style="position:absolute; left:8%; top:22%; width:52%; height:56%; border-radius:10px; background:#1d1d1d; border:1px solid rgba(255,255,255,.08);">
-          <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.07); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.18);"></span></div>
+      <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.08); border-radius:16px; min-height:230px; overflow:hidden;">
+        <div style="position:absolute; left:8%; top:22%; width:52%; height:56%; border-radius:10px; background:#2a2a2a; border:1px solid rgba(255,255,255,.16);">
+          <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.12); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.30);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.30);"></span></div>
         </div>
-        <div style="position:absolute; left:24%; top:36%; width:52%; height:56%; border-radius:10px; background:#242424; border:1px solid rgba(255,255,255,.10);">
-          <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.08); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.22);"></span></div>
+        <div style="position:absolute; left:24%; top:36%; width:52%; height:56%; border-radius:10px; background:#333333; border:1px solid rgba(255,255,255,.20);">
+          <div style="height:22px; border-bottom:1px solid rgba(255,255,255,.14); display:flex; align-items:center; gap:5px; padding:0 9px;"><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.34);"></span><span style="width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.34);"></span></div>
         </div>
-        <div style="position:absolute; right:7%; top:14%; width:44%; border-radius:12px; background:rgba(20,20,20,.96); border:1.5px solid rgba(30,215,96,.7); box-shadow:0 14px 34px rgba(0,0,0,.55), 0 0 22px rgba(30,215,96,.25); padding:13px 15px;">
-          <div style="height:6px; width:58%; border-radius:3px; background:rgba(255,255,255,.16); margin-bottom:9px;"></div>
+        <div style="position:absolute; right:7%; top:14%; width:44%; border-radius:12px; background:rgba(22,22,22,.97); border:1.5px solid rgba(30,215,96,.8); box-shadow:0 14px 34px rgba(0,0,0,.55), 0 0 24px rgba(30,215,96,.3); padding:13px 15px;">
+          <div style="height:6px; width:58%; border-radius:3px; background:rgba(255,255,255,.22); margin-bottom:9px;"></div>
           <div style="height:9px; width:84%; border-radius:4px; background:#1ED760; box-shadow:0 0 10px rgba(30,215,96,.4);"></div>
         </div>
       </div>
@@ -194,27 +203,45 @@
         <h3 style="font:700 26px/1.25 'Noto Sans TC',sans-serif; margin:0 0 12px;">Taskbar controller</h3>
         <p style="font:400 15px/1.75 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0; max-width:400px;">Lives in the Windows taskbar and system tray, so you can run, show, hide, or close the widget anytime.</p>
       </div>
-      <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.06); border-radius:16px; min-height:230px; padding:26px; display:flex; flex-direction:column; justify-content:flex-end;">
-        <div style="position:absolute; right:44px; bottom:86px; width:132px; background:#1d1d1d; border:1px solid rgba(255,255,255,.10); border-radius:10px; padding:7px 0; box-shadow:0 14px 30px rgba(0,0,0,.5);">
-          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#e8e8e8; padding:8px 14px;">Run Widget</div>
-          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#e8e8e8; padding:8px 14px; background:rgba(30,215,96,.10);">Show</div>
-          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#e8e8e8; padding:8px 14px;">Hide</div>
-          <div style="font:500 12.5px/1 'Noto Sans TC',sans-serif; color:#ff7b7b; padding:8px 14px; border-top:1px solid rgba(255,255,255,.07); margin-top:4px;">Close</div>
+      <div class="zig-vis" style="position:relative; background:#161616; border:1px solid rgba(255,255,255,.08); border-radius:16px; min-height:266px; overflow:hidden;">
+        <!-- controller window (matches the real app) -->
+        <div style="position:absolute; left:6%; top:12%; width:66%; background:#1f1f1f; border:1px solid rgba(255,255,255,.16); border-radius:10px; box-shadow:0 22px 50px rgba(0,0,0,.6);">
+          <div style="display:flex; align-items:center; justify-content:space-between; padding:9px 12px; border-bottom:1px solid rgba(255,255,255,.08);">
+            <div style="display:flex; align-items:center; gap:8px;">
+              <img src="../assets/app-icon.png" alt="" style="width:15px; height:15px; display:block;" />
+              <span style="font:600 12px 'Montserrat','Noto Sans TC',sans-serif; color:#e8e8e8;">Spotify Lyrics Widget</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:12px; color:#9a9a9a;">
+              <span style="font:400 13px 'Montserrat',sans-serif;">&#8211;</span>
+              <span style="font:400 11px 'Montserrat',sans-serif;">&#9633;</span>
+              <span style="font:400 12px 'Montserrat',sans-serif;">&#10005;</span>
+            </div>
+          </div>
+          <div style="padding:14px 16px 16px;">
+            <div style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#fff; margin-bottom:12px;">Spotify Lyrics Widget</div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:7px;"><span style="width:6px; height:6px; border-radius:50%; background:#1ED760; box-shadow:0 0 7px #1ED760;"></span><span style="font:400 12px 'Montserrat','Noto Sans TC',sans-serif; color:#b3b3b3;">Widget: Running</span></div>
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:16px;"><span style="width:6px; height:6px; border-radius:50%; background:#1ED760; box-shadow:0 0 7px #1ED760;"></span><span style="font:400 12px 'Montserrat','Noto Sans TC',sans-serif; color:#b3b3b3;">Widget: Visible</span></div>
+            <div style="display:flex; gap:10px;">
+              <div style="flex:1; text-align:center; font:600 12px 'Montserrat','Noto Sans TC',sans-serif; color:#e8e8e8; border:1px solid rgba(255,255,255,.18); border-radius:7px; padding:8px 0;">Hide Widget</div>
+              <div style="flex:1; text-align:center; font:600 12px 'Montserrat','Noto Sans TC',sans-serif; color:#e8e8e8; border:1px solid rgba(255,255,255,.18); border-radius:7px; padding:8px 0;">Close Widget</div>
+            </div>
+          </div>
         </div>
-        <div style="display:flex; align-items:center; gap:12px; background:#1a1a1a; border:1px solid rgba(255,255,255,.08); border-radius:10px; padding:10px 16px;">
-          <div style="width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,.10);"></div>
-          <div style="width:22px; height:22px; border-radius:6px; background:rgba(255,255,255,.10);"></div>
-          <div style="position:relative; width:26px; height:26px; display:flex; align-items:center; justify-content:center;">
-            <img src="../assets/app-icon.png" alt="" style="width:22px; height:22px; display:block;" />
-            <span style="position:absolute; left:50%; transform:translateX(-50%); bottom:-7px; width:16px; height:2.5px; border-radius:2px; background:#1ED760;"></span>
-          </div>
-          <div style="flex:1;"></div>
-          <div style="display:flex; gap:5px;">
-            <span style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.30);"></span>
-            <span style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.30);"></span>
-            <span style="width:5px; height:5px; border-radius:50%; background:rgba(255,255,255,.30);"></span>
-          </div>
-          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#6a6a6a;">13:24</span>
+
+        <!-- tray context menu -->
+        <div style="position:absolute; right:6%; bottom:52px; width:130px; background:#1f1f1f; border:1px solid rgba(255,255,255,.16); border-radius:8px; padding:5px 0; box-shadow:0 16px 34px rgba(0,0,0,.55);">
+          <div style="font:400 12px 'Montserrat',sans-serif; color:#e8e8e8; padding:7px 13px; background:rgba(30,215,96,.12);">Open / Hide</div>
+          <div style="font:400 12px 'Montserrat',sans-serif; color:#e8e8e8; padding:7px 13px;">Close Widget</div>
+        </div>
+
+        <!-- taskbar with system tray -->
+        <div style="position:absolute; left:0; right:0; bottom:0; height:40px; background:#0d0d0d; border-top:1px solid rgba(255,255,255,.09); display:flex; align-items:center; justify-content:flex-end; gap:14px; padding:0 16px;">
+          <span style="width:16px; height:16px; border-radius:3px; background:rgba(255,255,255,.14);"></span>
+          <span style="width:16px; height:16px; border-radius:3px; background:rgba(255,255,255,.14);"></span>
+          <span style="position:relative; display:flex; align-items:center; justify-content:center;">
+            <img src="../assets/app-icon.png" alt="" style="width:17px; height:17px; display:block; outline:2px solid rgba(30,215,96,.5); outline-offset:2px; border-radius:2px;" />
+          </span>
+          <span style="font:500 11px 'IBM Plex Mono',monospace; color:#8a8a8a; margin-left:4px;">13:24</span>
         </div>
       </div>
     </div>
