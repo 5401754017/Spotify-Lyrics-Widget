@@ -25,7 +25,7 @@ A small frameless window that floats over your desktop and shows the current Spo
 
 ### Download & install
 
-1. Download **[SpotifyLyricsWidgetSetup.exe](https://github.com/5401754017/spotify-lyrics-widget/releases/latest)** from the latest release.
+1. Download **[SpotifyLyricsWidgetSetup.exe](https://github.com/5401754017/Spotify-Lyrics-Widget/releases/latest)** from the latest release.
 2. Run the installer, choose a language, and finish.
 3. Launch **Spotify Lyrics Widget** (`SpotifyLyricsWidget.exe`) from the Start Menu or desktop shortcut.
 
@@ -68,7 +68,7 @@ Settings and logs are stored in `%APPDATA%\spotify-lyrics-widget`. Re-running a 
 
 ### 下載安裝
 
-1. 到最新 release 下載 **[SpotifyLyricsWidgetSetup.exe](https://github.com/5401754017/spotify-lyrics-widget/releases/latest)**。
+1. 到最新 release 下載 **[SpotifyLyricsWidgetSetup.exe](https://github.com/5401754017/Spotify-Lyrics-Widget/releases/latest)**。
 2. 執行安裝程式，選擇語言並完成安裝。
 3. 從開始選單或桌面捷徑開啟 **Spotify Lyrics Widget**。
 
@@ -111,7 +111,7 @@ Settings and logs are stored in `%APPDATA%\spotify-lyrics-widget`. Re-running a 
 
 ### 下载安装
 
-1. 到最新 release 下载 **[SpotifyLyricsWidgetSetup.exe](https://github.com/5401754017/spotify-lyrics-widget/releases/latest)**。
+1. 到最新 release 下载 **[SpotifyLyricsWidgetSetup.exe](https://github.com/5401754017/Spotify-Lyrics-Widget/releases/latest)**。
 2. 运行安装程序，选择语言并完成安装。
 3. 从开始菜单或桌面快捷方式打开 **Spotify Lyrics Widget**。
 
