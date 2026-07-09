@@ -532,11 +532,11 @@ class LyricsWidget(QWidget):
         )
 
     def show_offline(self):
-        self._lyrics = []
         self._lyric_label.setText("offline")
 
     def hide_offline(self):
         if self._lyric_label.text() == "offline":
+            self._current_line_idx = self._UNSET
             self._lyric_label.setText("")
 
     def _position_overlay_controls(self):

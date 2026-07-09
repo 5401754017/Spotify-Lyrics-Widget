@@ -406,6 +406,21 @@ def test_hide_offline_does_not_clear_real_lyric(qtbot):
     assert widget._lyric_label.text() == "new lyric after recovery"
 
 
+def test_offline_recovery_restores_same_paused_lyric_line(qtbot):
+    widget = LyricsWidget()
+    qtbot.addWidget(widget)
+    widget.set_duration(163000)
+    widget.set_lyrics([(90000, "line at ninety seconds"), (110000, "next line")])
+    widget.resync_local_timer(95828, False, time.monotonic())
+    assert widget._lyric_label.text() == "line at ninety seconds"
+
+    widget.show_offline()
+    widget.hide_offline()
+    widget.resync_local_timer(95828, False, time.monotonic())
+
+    assert widget._lyric_label.text() == "line at ninety seconds"
+
+
 def test_rate_limited_state_uses_fixed_layout(qtbot):
     widget = _shown_widget(qtbot)
     track_geometry = widget._track_label.geometry()
