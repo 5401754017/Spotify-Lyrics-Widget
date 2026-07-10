@@ -10,7 +10,7 @@ def test_inno_setup_script_has_expected_setup_metadata():
 
     assert '#define MyAppName "Spotify Lyrics Widget"' in script
     assert '#define MyAppExeName "SpotifyLyricsWidget.exe"' in script
-    assert '#define MyAppVersion "3.2.1"' in script
+    assert '#define MyAppVersion "3.2.2"' in script
     assert "AppId={{" in script
     assert "AppName={#MyAppName}" in script
     assert "AppVersion={#MyAppVersion}" in script

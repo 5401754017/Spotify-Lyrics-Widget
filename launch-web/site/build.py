@@ -25,7 +25,7 @@ I18N = SITE / "i18n"
 # Pages OG image URL, the version badge, and all download buttons follow.
 USER = "AgendaLin"
 REPO_NAME = "Spotify-Lyrics-Widget"
-VERSION = "v3.2.1"
+VERSION = "v3.2.2"
 
 REPO = f"https://github.com/{USER}/{REPO_NAME}"
 PAGES_BASE = f"https://{USER}.github.io/{REPO_NAME}"

@@ -49,7 +49,7 @@ python site/build.py          # 產生三個頁面
 改 `site/build.py` 最上面一行：
 
 ```python
-VERSION = "v3.2.1"   # ← 改成新版
+VERSION = "v3.2.2"   # ← 改成新版
 ```
 
 版本 badge 和三顆下載按鈕（nav / hero / 下載區）的連結會一起更新。

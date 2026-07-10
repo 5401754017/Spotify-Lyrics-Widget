@@ -4,11 +4,11 @@
 >
 > 注意：下方歷史版本區塊會保留已移除功能，例如 V2 playback controls。判斷目前產品行為時，以「目前實作版本」、「目前已完成」和 V3.2 區塊為準。
 
-最後更新：2026年7月6日
+最後更新：2026年7月10日
 
-目前實作版本：V3.2.1 歌詞來源品質修正 + 音符指示（在 V3.2 installer-only + language-aware onboarding 之上）
+目前實作版本：V3.2.2 offline recovery installer patch（在 V3.2.1 歌詞來源品質修正 + 音符指示之上）
 
-已發佈：public GitHub repo `https://github.com/5401754017/Spotify-Lyrics-Widget`，Release `v3.2.1` 已掛 `SpotifyLyricsWidgetSetup.exe`，含 MIT LICENSE 與三語 README。
+發佈版本：public GitHub repo `https://github.com/AgendaLin/Spotify-Lyrics-Widget`。公開 Release 為 `v3.2.2`，掛 `SpotifyLyricsWidgetSetup.exe`；`v3.2.1` 保留為上一版。
 
 下一步：外部乾淨環境 smoke test、code signing / antivirus false-positive 處理、playlist add（deferred）。
 
@@ -43,8 +43,9 @@
 - V3.2 language-aware onboarding：installer 有雙語 custom page 可選 English / 繁體中文，並把語言寫到 `%APPDATA%/spotify-lyrics-widget/install.ini`；首次 Client ID 設定視窗會照語言顯示，也可在視窗內切換
 - V3.2 first-run trigger：缺少 `client_id` 時，第一次開啟 app 會自動進入 Client ID 設定，不需要先按 controller 的 Run Widget
 - V3.2 installer shell refresh：`ie4uinit.exe -show` 必須 `nowait`，避免 installer 卡在 Finishing installation
+- V3.2.2 offline recovery：Spotify/API 暫時 offline 後恢復時，不會把已載入歌詞清空成空白畫面，offline 狀態消失後會重新繪出目前歌詞行
 
-最新完整測試紀錄：`303 passed`（2026-07-06，V3.2.1 歌詞來源修正 + 音符指示）
+最新完整測試紀錄：`304 passed`（2026-07-10，V3.2.2 offline recovery installer patch）
 
 ---
 
@@ -329,6 +330,26 @@ V3.2 決定 installer 成為唯一正式發佈產物，不再額外產 portable 
 - `installer/SpotifyLyricsWidget.iss` 版本 metadata 升到 `3.2.1`。
 - 建 public GitHub repo `Spotify-Lyrics-Widget`，push master，建 Release `v3.2.1` 上傳 `SpotifyLyricsWidgetSetup.exe`。
 - 新增 MIT `LICENSE`、三語（EN / 繁中 / 简中）README 含截圖與下載連結。
+
+---
+
+## V3.2.2 offline recovery installer patch
+
+這版把已修好的 offline recovery bug 做成正式 installer patch release。
+
+實作內容：
+
+- `src/widget.py`：`show_offline()` 不再清空已載入歌詞，避免 Spotify/API 暫時 offline 後恢復時只剩空白畫面。
+- `src/widget.py`：`hide_offline()` 清掉 offline 狀態時重設目前歌詞行索引，讓下一次 tick 能重新繪出當前歌詞。
+- `tests/test_widget.py`：新增 regression test，覆蓋 offline notice 不會清掉既有歌詞，以及恢復後可重新顯示歌詞。
+- `installer/SpotifyLyricsWidget.iss`：版本 metadata 升到 `3.2.2`。
+- `launch-web/site/build.py`：下載連結與版本 badge 升到 `v3.2.2`，並重新產生雙語 launch page。
+
+驗證：
+
+- Full suite：`304 passed`
+- App build：成功產出 `dist/SpotifyLyricsWidget/SpotifyLyricsWidget.exe`
+- Installer build：成功產出 `dist/SpotifyLyricsWidgetSetup.exe`
 
 ---
 
