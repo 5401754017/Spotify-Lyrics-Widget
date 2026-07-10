@@ -47,8 +47,10 @@
 
   /* two-column blocks collapse to one column on narrow screens */
   @media (max-width: 900px) {
-    .navlinks { display: none; }
-    .hero-grid { grid-template-columns: 1fr !important; }
+    .navlinks { display: none !important; }
+    .nav-inner { padding: 13px 16px !important; }
+    .nav-gh { display: none !important; }
+    .hero-grid { grid-template-columns: minmax(0,1fr) !important; }
     .hero-text { text-align: center !important; }
     .hero-text p { margin-left: auto !important; margin-right: auto !important; }
     .hero-ctas { justify-content: center !important; }
@@ -67,9 +69,12 @@
   @media (max-width: 720px) {
     .hero-h1 { font-size: 44px !important; }
     .show-h2 { font-size: 36px !important; }
-    .grid-3, .grid-2 { grid-template-columns: 1fr !important; }
-    .dl-grid { grid-template-columns: 1fr !important; }
-    .dl-side { border-left: none !important; border-top: 1px solid rgba(30,215,96,.18) !important; }
+    .hero-badge { font-size: 10px !important; letter-spacing: .08em !important; }
+    .grid-3, .grid-2 { grid-template-columns: minmax(0,1fr) !important; }
+    .dl-grid { grid-template-columns: minmax(0,1fr) !important; }
+    .dl-main { padding: 36px 22px !important; }
+    .dl-side { border-left: none !important; border-top: 1px solid rgba(30,215,96,.18) !important; padding: 30px 22px !important; }
+    .dl-btn { max-width: 100%; padding: 14px 18px !important; font-size: 14px !important; overflow-wrap: anywhere; word-break: break-word; }
   }
 </style>
 <script>document.documentElement.className += ' js';</script>
@@ -82,7 +87,7 @@
 
   <!-- sticky nav -->
   <nav style="position:sticky; top:0; z-index:50; background:rgba(10,10,10,.82); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); border-bottom:1px solid rgba(255,255,255,.06);">
-    <div style="max-width:1140px; margin:0 auto; padding:15px 34px; display:flex; align-items:center; justify-content:space-between;">
+    <div class="nav-inner" style="max-width:1140px; margin:0 auto; padding:15px 34px; display:flex; align-items:center; justify-content:space-between;">
       <div style="display:flex; align-items:center; gap:11px;">
         <img src="../assets/app-icon.png" alt="Lyrics Widget" style="width:30px; height:30px; display:block; filter:drop-shadow(0 0 1.4px rgba(255,255,255,.5));" />
         <span style="font:700 15px/1 'Montserrat',sans-serif;">Lyrics&nbsp;Widget</span>
@@ -92,7 +97,7 @@
         <a href="#flow-2a" style="font:600 13px 'Montserrat','Noto Sans TC',sans-serif; color:#c9c9c9; text-decoration:none;">{{nav_flow}}</a>
       </div>
       <div style="display:flex; align-items:center; gap:14px;">
-        <a href="{{repo}}" target="_blank" rel="noopener" aria-label="GitHub" style="display:flex; align-items:center; color:#c9c9c9;">
+        <a class="nav-gh" href="{{repo}}" target="_blank" rel="noopener" aria-label="GitHub" style="display:flex; align-items:center; color:#c9c9c9;">
           <svg width="20" height="20" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.6 7.6 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
         </a>
         <div class="langsw">
@@ -110,7 +115,7 @@
   <!-- LAUNCH HERO — text left, live widget demo right, vertically centered -->
   <div class="hero-grid" style="position:relative; max-width:1140px; width:100%; margin:0 auto; padding:44px 34px 64px; flex:1; display:grid; grid-template-columns:1.05fr 1fr; align-items:center; gap:48px;">
     <div class="hero-text" style="text-align:left;">
-    <div style="display:inline-flex; align-items:center; gap:9px; font:600 11px/1.4 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:.22em; color:#1ED760; background:rgba(30,215,96,.08); border:1px solid rgba(30,215,96,.24); padding:9px 16px; border-radius:999px; margin-bottom:28px; white-space:nowrap;">
+    <div class="hero-badge" style="display:inline-flex; align-items:center; gap:9px; font:600 11px/1.4 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:.22em; color:#1ED760; background:rgba(30,215,96,.08); border:1px solid rgba(30,215,96,.24); padding:9px 16px; border-radius:999px; margin-bottom:28px; white-space:nowrap;">
       <span style="width:6px; height:6px; border-radius:50%; background:#1ED760; box-shadow:0 0 10px #1ED760;"></span>{{badge}}
     </div>
     <h1 class="hero-h1" style="font:900 54px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.035em; margin:0 0 20px;">{{h1_pre}}<span style="background:linear-gradient(90deg,#1ED760,#7af0ab); -webkit-background-clip:text; background-clip:text; color:transparent;">{{h1_hl}}</span>{{h1_post}}</h1>
@@ -307,11 +312,11 @@
   <div id="dl-2a" class="reveal" style="max-width:1140px; margin:0 auto; padding:80px 34px 96px;">
     <div style="position:relative; overflow:hidden; background:linear-gradient(135deg,#16281d 0%,#101512 60%,#0c0c0c 100%); border:1px solid rgba(30,215,96,.24); border-radius:22px;">
       <div class="dl-grid" style="display:grid; grid-template-columns:1.15fr 1fr; align-items:stretch;">
-        <div style="position:relative; padding:54px 46px;">
+        <div class="dl-main" style="position:relative; padding:54px 46px;">
           <div style="position:absolute; top:-50px; left:-30px; width:230px; height:230px; border-radius:50%; background:radial-gradient(closest-side, rgba(30,215,96,.26), transparent 70%); filter:blur(6px);"></div>
           <h2 style="position:relative; font:800 38px/1.08 'Montserrat','Noto Sans TC',sans-serif; letter-spacing:-.025em; margin:0 0 12px;">{{dl_title}}</h2>
           <p style="position:relative; font:400 16px/1.6 'Noto Sans TC',sans-serif; color:#b3b3b3; margin:0 0 28px; max-width:380px;">{{dl_p}}</p>
-          <a href="{{download_url}}" style="position:relative; display:inline-flex; align-items:center; gap:10px; font:700 15px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:15px 28px; border-radius:999px; box-shadow:0 12px 34px rgba(30,215,96,.3);">
+          <a class="dl-btn" href="{{download_url}}" style="position:relative; display:inline-flex; align-items:center; gap:10px; font:700 15px 'Montserrat','Noto Sans TC',sans-serif; color:#0a0a0a; text-decoration:none; background:#1ED760; padding:15px 28px; border-radius:999px; box-shadow:0 12px 34px rgba(30,215,96,.3);">
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5v9M8 10.5 4.5 7M8 10.5 11.5 7" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M2.5 12.5v1.5a.5.5 0 0 0 .5.5h10a.5.5 0 0 0 .5-.5v-1.5" stroke="#0a0a0a" stroke-width="1.8" stroke-linecap="round"/></svg>
             {{dl_button}}
           </a>
